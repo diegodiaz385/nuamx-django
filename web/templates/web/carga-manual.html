@@ -1,0 +1,26 @@
+{% extends "web/_base.html" %}
+
+{% block content %}
+<section class="card p-6 space-y-4">
+  <h2 class="text-xl font-semibold">Carga manual (RF01)</h2>
+  <p class="text-[color:var(--muted)]">Completa los campos y guarda el registro.</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <input class="border p-2 rounded" placeholder="RUT / ID">
+    <input class="border p-2 rounded" placeholder="Nombre completo">
+    <input class="border p-2 rounded" placeholder="Carrera / Programa">
+    <input class="border p-2 rounded" placeholder="Jornada">
+    <input class="border p-2 rounded" placeholder="Calificación">
+    <input class="border p-2 rounded" placeholder="Año / Periodo">
+  </div>
+
+  <div class="flex gap-2">
+    <button class="btn" data-api="ping">💾 Guardar (demo)</button>
+    <button class="btn-ghost">Cancelar</button>
+  </div>
+
+  <p class="text-xs text-[color:var(--muted)]">
+    * Conectaremos este botón a un endpoint POST (Oracle) cuando definamos el modelo/consulta.
+  </p>
+</section>
+{% endblock %}

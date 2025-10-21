@@ -1,0 +1,27 @@
+{% extends "web/_base.html" %}
+
+{% block content %}
+<section class="card p-6 space-y-4">
+  <h2 class="text-xl font-semibold">Búsqueda / Filtrado (RF03)</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <input class="border p-2 rounded" placeholder="RUT / ID">
+    <input class="border p-2 rounded" placeholder="Nombre">
+    <select class="border p-2 rounded">
+      <option value="">Programa</option>
+      <option>Ingeniería</option>
+      <option>Salud</option>
+      <option>Derecho</option>
+    </select>
+  </div>
+
+  <div class="flex gap-2">
+    <button class="btn" data-api="roles">🔎 Buscar (demo)</button>
+    <button class="btn-ghost">Limpiar</button>
+  </div>
+
+  <div class="card p-4">
+    <div class="border-b pb-2 mb-2 font-medium">Resultados</div>
+    <p class="text-sm text-[color:var(--muted)]">Aún sin datos. Conectaremos a <code>/api/busqueda/</code>.</p>
+  </div>
+</section>
+{% endblock %}

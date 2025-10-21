@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+  {% load static %}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <title>NUAMX</title>
+
+  <!-- Tailwind (cárgalo solo una vez) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Estilos base -->
+  <style>
+    :root{
+      --nuamx:#0A6A3B; --nuamx-dark:#064F2C;
+      --ink:#1F2937; --muted:#6B7280; --bg:#F8FAFC; --card:#FFFFFF; --border:#E5E7EB;
+    }
+    .btn{background:var(--nuamx);color:#fff;padding:.55rem 1rem;border-radius:.6rem;font-weight:600}
+    .btn:hover{background:var(--nuamx-dark)}
+    .btn-ghost{border:1px solid var(--border);padding:.5rem .9rem;border-radius:.6rem}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:1rem}
+    .kpi .label{font-size:.8rem;color:var(--muted)}
+    .kpi .value{font-size:1.6rem;font-weight:700}
+    .nav a{display:block;padding:.6rem .9rem;border-radius:.6rem}
+    .nav a.active{background:#F0FFF6;color:#064F2C;font-weight:600;border:1px solid #D1FAE5}
+  </style>
+</head>
+
+<body class="bg-[color:var(--bg)] text-[color:var(--ink)]">
+  <!-- Header -->
+  <header class="h-16 bg-[color:var(--nuamx)] text-white flex items-center px-5 justify-between">
+    <div class="font-semibold tracking-wide">NUAMX</div>
+    <div class="flex items-center gap-3 text-sm">
+      <span class="opacity-90">admin@nuamx.com</span>
+      <a class="bg-white/15 px-3 py-1.5 rounded" href="login.html">Salir</a>
+    </div>
+  </header>
+
+  <div class="flex">
+    <!-- Sidebar -->
+    <aside class="hidden md:block w-68 min-w-[260px] min-h-[calc(100vh-4rem)] bg-white border-r">
+      <div class="p-4 text-xs uppercase tracking-wide text-[color:var(--muted)]">Menú</div>
+      <nav class="nav px-3 pb-6 space-y-1">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="carga-manual.html">Carga manual (RF01)</a>
+        <a href="carga-masiva.html">Carga masiva (RF02)</a>
+        <a href="busqueda.html">Búsqueda / Filtrado (RF03)</a>
+        <a href="detalle.html">Detalle / Edición (RF04)</a>
+        <a href="reportes.html">Reportes (RF05)</a>
+        <a href="no-inscritos.html">No inscritos (RF06)</a>
+        <a href="admin-roles.html">Usuarios / Roles (RNF01)</a>
+      </nav>
+    </aside>
+
+    <!-- Contenido -->
+    <main class="flex-1 p-6 md:p-8">
+      <!-- BREADCRUMB (opcional) -->
+      <div class="text-sm text-[color:var(--muted)] mb-2">Inicio / Sección</div>
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-semibold">TÍTULO</h1>
+        <div class="flex gap-2">
+          <button class="btn-ghost">Ayuda</button>
+          <button class="btn">Acción</button>
+        </div>
+      </div>
+
+      <!-- Aquí cada página puede inyectar su contenido -->
+      {% block content %}
+      <section class="card p-6">Contenido…</section>
+      {% endblock %}
+    </main>
+  </div>
+
+  <!-- Script: resaltar enlace activo del menú -->
+  <script>
+    (function(){
+      const links = document.querySelectorAll('.nav a');
+      const path = location.pathname.split('/').pop() || 'dashboard.html';
+      links.forEach(a => {
+        const href = a.getAttribute('href');
+        if (href === path) a.classList.add('active');
+      });
+    })();
+  </script>
+
+  <!-- Script global que controla botones y API -->
+  <script src="{% static 'app.js' %}"></script>
+</body>
+</html>

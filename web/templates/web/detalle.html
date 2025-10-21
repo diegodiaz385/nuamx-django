@@ -1,0 +1,21 @@
+{% extends "web/_base.html" %}
+
+{% block content %}
+<section class="card p-6 space-y-4">
+  <h2 class="text-xl font-semibold">Detalle / Edición (RF04)</h2>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <input class="border p-2 rounded" placeholder="RUT / ID" value="11.111.111-1">
+    <input class="border p-2 rounded" placeholder="Nombre completo" value="Juan Pérez">
+    <input class="border p-2 rounded" placeholder="Programa" value="Ingeniería">
+    <input class="border p-2 rounded" placeholder="Jornada" value="Diurna">
+    <input class="border p-2 rounded" placeholder="Calificación" value="6.1">
+    <input class="border p-2 rounded" placeholder="Periodo" value="2025-02">
+  </div>
+
+  <div class="flex gap-2">
+    <button class="btn" data-api="ping">💾 Guardar cambios (demo)</button>
+    <button class="btn-ghost">Volver</button>
+  </div>
+</section>
+{% endblock %}

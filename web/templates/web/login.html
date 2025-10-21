@@ -1,0 +1,20 @@
+{% extends "web/_base.html" %}
+
+{% block content %}
+<section class="max-w-md mx-auto card p-6 space-y-4">
+  <h2 class="text-xl font-semibold">Iniciar sesión</h2>
+  <p class="text-[color:var(--muted)]">Accede con tus credenciales NUAMX.</p>
+
+  <input id="email" type="email" placeholder="Correo"
+         class="border border-gray-300 rounded p-2 w-full">
+  <input id="password" type="password" placeholder="Contraseña"
+         class="border border-gray-300 rounded p-2 w-full">
+
+  <button data-api="login"
+          class="btn w-full">🔐 Ingresar</button>
+
+  <p class="text-xs text-[color:var(--muted)]">
+    * Por ahora valida con mock. Luego conectamos a Oracle (SimpleJWT o endpoint propio).
+  </p>
+</section>
+{% endblock %}

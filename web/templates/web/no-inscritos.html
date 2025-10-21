@@ -1,0 +1,32 @@
+{% extends "web/_base.html" %}
+
+{% block content %}
+<section class="card p-6 space-y-4">
+  <h2 class="text-xl font-semibold">No inscritos (RF06)</h2>
+  <p class="text-[color:var(--muted)]">Listado de registros pendientes de inscripción / validación.</p>
+
+  <div class="flex gap-2">
+    <button class="btn" data-api="roles">🔄 Actualizar lista (demo)</button>
+    <button class="btn-ghost">Exportar CSV</button>
+  </div>
+
+  <table class="w-full text-sm mt-4">
+    <thead class="bg-gray-50">
+      <tr>
+        <th class="text-left p-3">RUT</th>
+        <th class="text-left p-3">Nombre</th>
+        <th class="text-left p-3">Programa</th>
+        <th class="text-left p-3">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="border-t">
+        <td class="p-3">22.222.222-2</td>
+        <td class="p-3">María López</td>
+        <td class="p-3">Salud</td>
+        <td class="p-3"><span class="px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs">Pendiente</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

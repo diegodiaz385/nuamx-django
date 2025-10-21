@@ -1,0 +1,23 @@
+{% extends "web/_base.html" %}
+
+{% block content %}
+<section class="card p-6 space-y-4">
+  <h2 class="text-xl font-semibold">Carga masiva (RF02)</h2>
+  <p class="text-[color:var(--muted)]">
+    Sube un archivo CSV/XLSX con el formato indicado.
+  </p>
+
+  <div class="space-y-2">
+    <input type="file" class="border p-2 rounded w-full">
+    <div class="text-xs text-[color:var(--muted)]">
+      * En la versión con backend, enviaremos el archivo a <code>/api/cargas/masiva/</code>.
+    </div>
+  </div>
+
+  <div class="flex gap-2">
+    <button class="btn" data-api="ping">⏫ Subir (demo)</button>
+    <button class="btn-ghost">Descargar plantilla</button>
+  </div>
+</section>
+{% endblock %}
+
