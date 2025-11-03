@@ -2,21 +2,21 @@
 
 {% block content %}
 <section class="card p-6 space-y-4">
-  <h2 class="text-xl font-semibold">Reportes (RF05)</h2>
+  <h2 class="text-xl font-semibold">Reportes</h2>
+  <p class="text-sm text-gray-500 mt-1">Genera y descarga reportes con filtros y totales.</p>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-    <button class="btn" data-api="ping">📄 Generar reporte diario (demo)</button>
-    <button class="btn" data-api="ping">📊 Generar reporte semanal (demo)</button>
-    <button class="btn" data-api="ping">📈 Generar reporte mensual (demo)</button>
+    <button class="btn" data-api="report:diario">📄 Generar reporte diario</button>
+    <button class="btn" data-api="report:semanal">📊 Generar reporte semanal</button>
+    <button class="btn" data-api="report:mensual">📈 Generar reporte mensual</button>
   </div>
 
   <div class="card p-4">
-    <div class="border-b pb-2 mb-2 font-medium">Historial</div>
-    <ul class="text-sm space-y-1">
-      <li>04-09-2025 — Reporte mensual — <span class="text-green-600">OK</span></li>
-      <li>03-09-2025 — Reporte semanal — <span class="text-yellow-600">Advertencias</span></li>
-    </ul>
+    <div class="border-b pb-2 mb-2 font-medium">Cómo funciona</div>
+    <p class="text-sm text-gray-600">
+      Cada botón crea y descarga un <strong>CSV</strong> con datos demo listos para abrir en Excel.
+      Puedes cambiar el contenido desde <code>static/app.js</code>.
+    </p>
   </div>
 </section>
 {% endblock %}
-

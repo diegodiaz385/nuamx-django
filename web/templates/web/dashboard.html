@@ -1,72 +1,166 @@
 {% extends "web/_base.html" %}
 
+{% block html_title %}NUAMX – Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}
+<div class="muted">Resumen operativo y accesos rápidos.</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ====== Dashboard layout ====== */
+  .grid{display:grid;gap:14px}
+  .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media (max-width: 980px){ .grid-3{grid-template-columns:1fr} }
+
+  .kpi{display:flex;flex-direction:column;gap:6px}
+  .kpi .label{font-size:.9rem;color:#6b7280}
+  .kpi .value{font-size:2rem;font-weight:800;color:#111;line-height:1.1}
+  .kpi .meta{font-size:.85rem;color:#6b7280}
+
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+  .section-title{font-weight:700;margin:0 0 8px 0}
+  .table-actions{display:flex;gap:8px;align-items:center}
+
+  /* ====== Accesos rápidos (bonito) ====== */
+  .quick-grid{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media (max-width: 980px){ .quick-grid{grid-template-columns:1fr} }
+  .quick-card{
+    display:flex;gap:12px;align-items:flex-start;
+    text-decoration:none;color:inherit;background:#fff;
+    border:1px solid #e5e7eb;border-radius:12px;padding:14px;
+    transition:.16s ease; position:relative; overflow:hidden;
+  }
+  .quick-card:hover{transform:translateY(-2px); box-shadow:0 6px 18px rgba(16,24,40,.08); border-color:#d6e9df}
+  .quick-icon{
+    width:42px;height:42px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:#E8FFF2; /* tono verde suave */
+    font-size:20px; user-select:none; flex:0 0 42px;
+    border:1px solid #c9f0da;
+  }
+  .quick-body{display:flex;flex-direction:column;gap:4px}
+  .quick-title{font-weight:700}
+  .quick-desc{font-size:.9rem;color:#6b7280}
+  .quick-arrow{
+    position:absolute;right:12px;top:50%;transform:translateY(-50%);
+    opacity:.3;font-size:18px;transition:.16s ease;
+  }
+  .quick-card:hover .quick-arrow{opacity:.7; right:10px}
+</style>
+{% endblock %}
+
 {% block content %}
-  <!-- Dashboard principal -->
-  <div class="text-sm text-[color:var(--muted)] mb-2">Inicio / Dashboard</div>
+<!-- Barra superior de acciones -->
+<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+  <div class="muted">Inicio / Dashboard</div>
+  <div class="toolbar">
+    <button class="btn-ghost" data-api="report:mensual" type="button">Descargar CSV</button>
+    <a href="carga-masiva.html" class="btn">Nueva carga</a>
+  </div>
+</div>
 
-  <div class="flex items-center justify-between mb-5">
-    <h1 class="text-2xl font-semibold">Dashboard</h1>
-    <div class="flex gap-2">
-      <button class="btn-ghost">Descargar CSV</button>
-      <button class="btn">Nueva carga</button>
+<!-- KPIs -->
+<section class="grid grid-3">
+  <div class="card kpi">
+    <div class="label">Registros totales</div>
+    <div class="value">12.540</div>
+    <div class="meta">Acumulado histórico</div>
+  </div>
+  <div class="card kpi">
+    <div class="label">Errores en últimas cargas</div>
+    <div class="value" style="color:#b91c1c">14</div>
+    <div class="meta">Últimos procesos</div>
+  </div>
+  <div class="card kpi">
+    <div class="label">Reportes generados</div>
+    <div class="value">38</div>
+    <div class="meta">Período reciente</div>
+  </div>
+</section>
+
+<!-- Últimas cargas -->
+<section class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+    <h3 class="section-title">Últimas cargas</h3>
+    <div class="table-actions">
+      <button class="btn-ghost" data-api="download:ultimas-cargas" type="button">Ver todo (CSV)</button>
+      <button class="btn-ghost" type="button" onclick="location.reload()">Actualizar</button>
     </div>
   </div>
 
-  <!-- Tarjetas resumen -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="card p-5">
-      <div class="text-sm text-[color:var(--muted)]">Calificaciones totales</div>
-      <div class="text-2xl font-bold">12.540</div>
-    </div>
-    <div class="card p-5">
-      <div class="text-sm text-[color:var(--muted)]">Errores últimas cargas</div>
-      <div class="text-2xl font-bold text-red-600">14</div>
-    </div>
-    <div class="card p-5">
-      <div class="text-sm text-[color:var(--muted)]">Reportes generados</div>
-      <div class="text-2xl font-bold">38</div>
-    </div>
-  </div>
-
-  <!-- Tabla -->
-  <div class="card overflow-hidden">
-    <div class="border-b px-5 py-3 font-medium">Últimas cargas</div>
-    <table class="w-full text-sm">
-      <thead class="bg-gray-50">
+  <div style="overflow:auto">
+    <table>
+      <thead>
         <tr>
-          <th class="text-left p-3">Fecha</th>
-          <th class="text-left p-3">Usuario</th>
-          <th class="text-left p-3">Registros</th>
-          <th class="text-left p-3">Estado</th>
+          <th>Fecha</th>
+          <th>Usuario</th>
+          <th>Registros</th>
+          <th>Tipo</th>
+          <th>Observaciones</th>
+          <th>Estado</th>
         </tr>
       </thead>
       <tbody>
-        <tr class="border-t">
-          <td class="p-3">04-09-2025</td>
-          <td class="p-3">admin@nuamx.com</td>
-          <td class="p-3">1.200</td>
-          <td class="p-3">
-            <span class="px-2 py-1 rounded bg-green-100 text-green-700 text-xs">Completado</span>
-          </td>
+        <tr>
+          <td>04-09-2025 10:12</td>
+          <td>admin@nuamx.com</td>
+          <td>1.200</td>
+          <td>Carga masiva (XLSX)</td>
+          <td>0 duplicados</td>
+          <td>Completado</td>
         </tr>
-        <tr class="border-t">
-          <td class="p-3">03-09-2025</td>
-          <td class="p-3">analista@nuamx.com</td>
-          <td class="p-3">650</td>
-          <td class="p-3">
-            <span class="px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs">Advertencias</span>
-          </td>
+        <tr>
+          <td>03-09-2025 18:41</td>
+          <td>analista@nuamx.com</td>
+          <td>650</td>
+          <td>Carga masiva (CSV)</td>
+          <td>12 advertencias (montos)</td>
+          <td>Advertencias</td>
         </tr>
-        <tr class="border-t">
-          <td class="p-3">02-09-2025</td>
-          <td class="p-3">admin@nuamx.com</td>
-          <td class="p-3">0</td>
-          <td class="p-3">
-            <span class="px-2 py-1 rounded bg-red-100 text-red-700 text-xs">Fallida</span>
-          </td>
+        <tr>
+          <td>02-09-2025 09:02</td>
+          <td>admin@nuamx.com</td>
+          <td>0</td>
+          <td>Carga manual</td>
+          <td>Error de formato</td>
+          <td>Fallida</td>
         </tr>
       </tbody>
     </table>
   </div>
-{% endblock %}
+</section>
 
+<!-- Accesos rápidos (nuevo look) -->
+<section class="card">
+  <div class="section-title">Accesos rápidos</div>
+  <div class="quick-grid" role="list">
+    <a class="quick-card" href="carga-masiva.html" role="listitem" aria-label="Cargar archivo">
+      <div class="quick-icon">📤</div>
+      <div class="quick-body">
+        <div class="quick-title">Cargar archivo</div>
+        <div class="quick-desc">Sube CSV/XLSX y valida antes de publicar.</div>
+      </div>
+      <div class="quick-arrow">➜</div>
+    </a>
+
+    <a class="quick-card" href="busqueda.html" role="listitem" aria-label="Buscar registros">
+      <div class="quick-icon">🔎</div>
+      <div class="quick-body">
+        <div class="quick-title">Buscar registros</div>
+        <div class="quick-desc">Filtra por RUT, período, estado y más.</div>
+      </div>
+      <div class="quick-arrow">➜</div>
+    </a>
+
+    <a class="quick-card" href="reportes.html" role="listitem" aria-label="Reportes">
+      <div class="quick-icon">📈</div>
+      <div class="quick-body">
+        <div class="quick-title">Reportes</div>
+        <div class="quick-desc">Descarga reportes diarios, semanales o mensuales.</div>
+      </div>
+      <div class="quick-arrow">➜</div>
+    </a>
+  </div>
+</section>
+{% endblock %}

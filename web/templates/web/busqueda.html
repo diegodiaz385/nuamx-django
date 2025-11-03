@@ -1,27 +1,200 @@
 {% extends "web/_base.html" %}
 
+{% block html_title %}NUAMX – Búsqueda / Filtrado{% endblock %}
+{% block page_title %}Búsqueda / Filtrado{% endblock %}
+{% block page_subtitle %}
+<p class="muted">Consulta de calificaciones desde la API usando filtros combinados.</p>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .grid-6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+  @media (max-width: 1024px){ .grid-6{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width: 640px){ .grid-6{grid-template-columns:repeat(1,minmax(0,1fr))} }
+  .input,.select{border:1px solid #e5e7eb;border-radius:10px;padding:10px;font:inherit;background:#fff}
+  .muted{color:#6b7280}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .table-wrap{overflow:auto;border:1px solid #e5e7eb;border-radius:12px}
+  table{width:100%;border-collapse:collapse;background:#fff}
+  thead th{background:#f8fafc;font-weight:600;border-bottom:1px solid #e5e7eb}
+  th,td{padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:left;vertical-align:middle;white-space:nowrap}
+  .pill{display:inline-block;border:1px solid #e5e7eb;border-radius:999px;padding:2px 10px;background:#f8fafc;font-size:.85rem}
+  .spinner{width:16px;height:16px;border:2px solid #e5e7eb;border-top-color:#0A6A3B;border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+{% endblock %}
+
 {% block content %}
-<section class="card p-6 space-y-4">
-  <h2 class="text-xl font-semibold">Búsqueda / Filtrado (RF03)</h2>
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-    <input class="border p-2 rounded" placeholder="RUT / ID">
-    <input class="border p-2 rounded" placeholder="Nombre">
-    <select class="border p-2 rounded">
-      <option value="">Programa</option>
-      <option>Ingeniería</option>
-      <option>Salud</option>
-      <option>Derecho</option>
+<section class="card p-6 space-y-5">
+  <!-- Filtros -->
+  <div class="grid-6">
+    <input id="f_rut" class="input" placeholder="RUT (ej: 11.111.111-1)">
+    <input id="f_razon" class="input" placeholder="Razón social">
+    <input id="f_pdesde" class="input" type="month" placeholder="Desde (YYYY-MM)">
+    <input id="f_phasta" class="input" type="month" placeholder="Hasta (YYYY-MM)">
+    <select id="f_tipo" class="select">
+      <option value="">Tipo de instrumento</option>
+      <option>Factura</option>
+      <option>Boleta</option>
+      <option>Nota de crédito</option>
+      <option>Otro</option>
+    </select>
+    <select id="f_estado" class="select">
+      <option value="">Estado de validación</option>
+      <option>Válida</option>
+      <option>Con advertencias</option>
+      <option>Rechazada</option>
     </select>
   </div>
 
-  <div class="flex gap-2">
-    <button class="btn" data-api="roles">🔎 Buscar (demo)</button>
-    <button class="btn-ghost">Limpiar</button>
+  <div class="toolbar">
+    <div class="flex items-center gap-2">
+      <button id="btn_buscar" class="btn" type="button">🔎 Buscar</button>
+      <button id="btn_limpiar" class="btn-ghost" type="button">Limpiar filtros</button>
+      <button id="btn_export" class="btn-ghost" type="button">⬇ Exportar CSV</button>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <span id="badge_count" class="pill">0 resultados</span>
+      <span id="busy" style="display:none" class="flex items-center gap-2 muted">
+        <span class="spinner"></span> Consultando API…
+      </span>
+    </div>
   </div>
 
-  <div class="card p-4">
-    <div class="border-b pb-2 mb-2 font-medium">Resultados</div>
-    <p class="text-sm text-[color:var(--muted)]">Aún sin datos. Conectaremos a <code>/api/busqueda/</code>.</p>
+  <!-- Resultados -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>RUT</th>
+          <th>Razón social</th>
+          <th>Período</th>
+          <th>Tipo</th>
+          <th>Folio</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Observaciones</th>
+          <th>Creado</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
   </div>
+
+  <p id="empty" class="muted" style="display:none">Sin resultados para los filtros actuales.</p>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+
+  const API_LIST = "/api/calificaciones/";
+  const API_CSV  = "/api/calificaciones/export_csv/";
+
+  function qsFromFilters(){
+    const p = new URLSearchParams();
+    const rut    = $("#f_rut").value.trim();
+    const razon  = $("#f_razon").value.trim();
+    const pdesde = $("#f_pdesde").value.trim();
+    const phasta = $("#f_phasta").value.trim();
+    const tipo   = $("#f_tipo").value.trim();
+    const estado = $("#f_estado").value.trim();
+
+    if(rut)    p.set("rut", rut);
+    if(razon)  p.set("razon", razon);
+    if(pdesde) p.set("pdesde", pdesde);
+    if(phasta) p.set("phasta", phasta);
+    if(tipo)   p.set("tipo", tipo);
+    if(estado) p.set("estado", estado);
+    return p;
+  }
+
+  function fmtMoney(v){
+    const n = Number(v ?? 0);
+    try{ return n.toLocaleString("es-CL", {style:"currency", currency:"CLP", maximumFractionDigits:0}); }
+    catch{ return n.toFixed(0); }
+  }
+
+  function render(rows){
+    const tb = $("#tbody");
+    const empty = $("#empty");
+    const badge = $("#badge_count");
+    tb.innerHTML = "";
+
+    if(!rows || !rows.length){
+      empty.style.display = "block";
+      badge.textContent = "0 resultados";
+      return;
+    }
+    empty.style.display = "none";
+    badge.textContent = `${rows.length} resultado${rows.length>1?"s":""}`;
+
+    tb.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.rut}</td>
+        <td title="${r.razon_social||""}">${r.razon_social||""}</td>
+        <td>${r.periodo}</td>
+        <td>${r.tipo_instrumento}</td>
+        <td>${r.folio}</td>
+        <td>${fmtMoney(r.monto)}</td>
+        <td>${r.estado_validacion}</td>
+        <td title="${r.observaciones||""}">${(r.observaciones||"").slice(0,40)}${(r.observaciones||"").length>40?"…":""}</td>
+        <td>${new Date(r.created_at).toLocaleString("es-CL")}</td>
+      </tr>
+    `).join("");
+  }
+
+  async function fetchList(){
+    const busy = $("#busy");
+    busy.style.display = "inline-flex";
+    try{
+      const q = qsFromFilters();
+      const url = q.toString() ? `${API_LIST}?${q.toString()}` : API_LIST;
+      const r = await fetch(url);
+      if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      const data = await r.json();
+      render(Array.isArray(data)?data:[]);
+    }catch(err){
+      render([]);
+      console.error("Error consultando API:", err);
+    }finally{
+      busy.style.display = "none";
+    }
+  }
+
+  function clearFilters(){
+    $("#f_rut").value = "";
+    $("#f_razon").value = "";
+    $("#f_pdesde").value = "";
+    $("#f_phasta").value = "";
+    $("#f_tipo").value = "";
+    $("#f_estado").value = "";
+  }
+
+  function exportCSV(){
+    const q = qsFromFilters();
+    const url = q.toString() ? `${API_CSV}?${q.toString()}` : API_CSV;
+    // Navegación directa para descargar desde backend
+    window.location.href = url;
+  }
+
+  // Eventos
+  $("#btn_buscar").addEventListener("click", fetchList);
+  $("#btn_limpiar").addEventListener("click", () => { clearFilters(); fetchList(); });
+  $("#btn_export").addEventListener("click", exportCSV);
+
+  // Enter para buscar desde cualquier input
+  document.addEventListener("keydown", (e)=>{
+    if(e.key === "Enter"){
+      const inForm = e.target.closest(".input, .select");
+      if(inForm) { e.preventDefault(); fetchList(); }
+    }
+  });
+
+  // Carga inicial
+  fetchList();
+})();
+</script>
 {% endblock %}

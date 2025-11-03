@@ -1,26 +1,385 @@
 {% extends "web/_base.html" %}
 
+{% block page_title %}Carga manual{% endblock %}
+{% block page_subtitle %}Registra calificaciones en la base real vía API.{% endblock %}
+
 {% block content %}
-<section class="card p-6 space-y-4">
-  <h2 class="text-xl font-semibold">Carga manual (RF01)</h2>
-  <p class="text-[color:var(--muted)]">Completa los campos y guarda el registro.</p>
+<style>
+  :root{
+    --col-gap: 22px;
+    --row-gap: 16px;
+    --pad: 1.25rem;
+  }
+  .card-pad{ padding: var(--pad); }
+  .muted{ color:var(--muted); }
+  .hr{ border:0; border-top:1px solid var(--border); margin: 14px 0 }
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <input class="border p-2 rounded" placeholder="RUT / ID">
-    <input class="border p-2 rounded" placeholder="Nombre completo">
-    <input class="border p-2 rounded" placeholder="Carrera / Programa">
-    <input class="border p-2 rounded" placeholder="Jornada">
-    <input class="border p-2 rounded" placeholder="Calificación">
-    <input class="border p-2 rounded" placeholder="Año / Periodo">
+  .form-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--row-gap) var(--col-gap);
+    align-items:start;
+  }
+  .span-2{ grid-column: span 2; }
+
+  .place-start{ justify-self:start; }
+  .nudge-right-12{ margin-left:12px; }
+  .nudge-right-16{ margin-left:16px; }
+  .nudge-right-20{ margin-left:20px; }
+  .nudge-left-12 { margin-left:-12px; }
+
+  @media (max-width: 1024px){
+    .form-grid{ grid-template-columns: 1fr; }
+    .span-2{ grid-column: auto; }
+    .nudge-right-12,.nudge-right-16,.nudge-right-20,.nudge-left-12{ margin-left:0; }
+  }
+
+  .fg{ display:flex; flex-direction:column; gap:8px; }
+  .lbl{ font-size:.92rem; color:var(--muted); display:flex; align-items:center; gap:.6rem; }
+
+  .ctl{
+    width:100%;
+    border:1px solid var(--border);
+    border-radius:.6rem;
+    padding:.65rem .8rem;
+    min-height:44px;
+    background:#fff;
+  }
+  textarea.ctl{ min-height: 120px; }
+
+  .ctl-fat-narrow{
+    width:auto;
+    border:1px solid var(--border);
+    border-radius:.6rem;
+    padding:.65rem .8rem;
+    min-height:44px;
+    background:#fff;
+  }
+  .ctl-slim{ padding:.5rem .65rem; min-height:40px; }
+
+  .narrow-300{ min-width:260px; max-width:300px; }
+  .narrow-280{ min-width:240px; max-width:280px; }
+  .ph-soft::placeholder{ opacity:.45; color: var(--muted); }
+  .obs-narrow{ width:auto; max-width:560px; }
+
+  @media (max-width: 1024px){
+    .ctl-fat-narrow,.ctl-slim{ width:100%; min-width:0; max-width:100%; }
+    .narrow-300,.narrow-280{ min-width:0; max-width:100%; }
+    .obs-narrow{ max-width:100%; }
+  }
+
+  .link-mini{
+    font-size:.85rem;
+    border:1px solid var(--border);
+    padding:.25rem .55rem;
+    border-radius:.5rem;
+    background:#fff;
+    cursor:pointer;
+  }
+  .link-mini:hover{ background:#f8fafc; }
+
+  .bar{ display:flex; gap:12px; align-items:center; justify-content:space-between }
+  table.wfull{ width:100%; font-size:.925rem; }
+  thead th{ background:#f8fafc; font-weight:600; }
+  th,td{ text-align:left; padding:.65rem .75rem; border-bottom:1px solid var(--border); }
+</style>
+
+<section class="space-y-6">
+
+  <!-- FORM -->
+  <div class="card card-pad">
+    <div class="bar">
+      <div>
+        <h2 class="text-base font-semibold m-0">Nueva calificación</h2>
+        <p class="muted text-sm m-0">Obligatorios: RUT, Período, Tipo, Folio, Monto y Estado.</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="cm_save" class="btn" type="button">💾 Guardar</button>
+        <button id="cm_clear" class="btn-ghost" type="button">🧹 Limpiar</button>
+      </div>
+    </div>
+
+    <hr class="hr">
+
+    <div class="form-grid">
+      <!-- Fila 1 -->
+      <div class="fg">
+        <div class="lbl">RUT</div>
+        <input id="cm_rut" class="ctl" placeholder="11.111.111-1">
+      </div>
+
+      <div class="fg place-start nudge-right-12">
+        <div class="lbl">Tipo de instrumento</div>
+        <select id="cm_tipo" class="ctl-fat-narrow narrow-300">
+          <option value="">Selecciona…</option>
+          <option>Factura</option>
+          <option>Boleta</option>
+          <option>Nota de crédito</option>
+        </select>
+      </div>
+
+      <div class="fg nudge-left-12">
+        <div class="lbl">Folio</div>
+        <input id="cm_folio" class="ctl-fat-narrow ctl-slim narrow-280 ph-soft" placeholder="F-12345">
+      </div>
+
+      <!-- Fila 2 -->
+      <div class="fg">
+        <div class="lbl">Razón social</div>
+        <input id="cm_razon" class="ctl" placeholder="Empresa SpA">
+      </div>
+
+      <div class="fg place-start nudge-right-16">
+        <div class="lbl">Monto (<span class="fx-label"></span>)</div>
+        <input id="cm_monto" class="ctl-fat-narrow narrow-300" inputmode="decimal" placeholder="0">
+        <!-- Preview SIEMPRE en USD -->
+        <p id="monto_fx_preview" class="text-sm text-[color:var(--muted)] mt-1">≈ 0 USD</p>
+      </div>
+
+      <div class="fg nudge-left-12">
+        <div class="lbl">Estado de validación</div>
+        <select id="cm_estado" class="ctl">
+          <option value="">Selecciona…</option>
+          <option value="Válida">Válida</option>
+          <option value="Con advertencias">Con advertencias</option>
+          <option value="Rechazada">Rechazada</option>
+        </select>
+      </div>
+
+      <!-- Fila 3 -->
+      <div class="fg">
+        <div class="lbl">
+          Período (YYYY-MM)
+          <button type="button" class="link-mini"
+            onclick="(function(){
+              const d=new Date(), m=('0'+(d.getMonth()+1)).slice(-2);
+              document.getElementById('cm_periodo').value=d.getFullYear()+'-'+m;
+            })()">Mes actual</button>
+        </div>
+        <input id="cm_periodo" class="ctl" placeholder="2025-12">
+      </div>
+
+      <div class="fg span-2 nudge-right-20">
+        <div class="lbl">Observaciones</div>
+        <textarea id="cm_obs" class="ctl obs-narrow" placeholder="Notas opcionales…"></textarea>
+      </div>
+    </div>
   </div>
 
-  <div class="flex gap-2">
-    <button class="btn" data-api="ping">💾 Guardar (demo)</button>
-    <button class="btn-ghost">Cancelar</button>
-  </div>
+  <!-- ÚLTIMOS CREADOS -->
+  <div class="card card-pad">
+    <div class="bar" style="margin-bottom:6px">
+      <h3 class="text-base font-semibold m-0">Últimos creados</h3>
+      <a href="busqueda.html" class="btn-ghost">Ir a Búsqueda / Filtrado</a>
+    </div>
 
-  <p class="text-xs text-[color:var(--muted)]">
-    * Conectaremos este botón a un endpoint POST (Oracle) cuando definamos el modelo/consulta.
-  </p>
+    <div class="overflow-x-auto">
+      <table class="wfull">
+        <thead>
+          <tr>
+            <th>RUT</th>
+            <th>Razón</th>
+            <th>Período</th>
+            <th>Tipo</th>
+            <th>Folio</th>
+            <th>Monto (<span class="fx-label"></span>)</th>
+            <th>Estado</th>
+            <th>Creado</th>
+          </tr>
+        </thead>
+        <tbody id="cm_last_tbody"></tbody>
+      </table>
+    </div>
+  </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // ====== Moneda / locales ======
+  function currentCur(){
+    const sel = document.getElementById('fx_selector');
+    return (sel?.value || (window.NUAMX_FX?.current) || 'CLP').toUpperCase();
+  }
+  function supportsCents(code){
+    code = (code||'CLP').toUpperCase();
+    return (code === 'USD' || code === 'PEN'); // CLP/COP sin decimales
+  }
+  function localeForCurrency(code){
+    code = (code||'CLP').toUpperCase();
+    if (code === 'USD') return 'en-US';
+    if (code === 'PEN') return 'es-PE';
+    if (code === 'COP') return 'es-CO';
+    return 'es-CL'; // CLP
+  }
+
+  // ====== Caret helpers ======
+  function digitIndexLeftOfCaret(value, caret){
+    let k=0; for(let i=0;i<Math.min(caret,value.length);i++){ if(/\d/.test(value[i])) k++; } return k;
+  }
+  function setCaretByDigitIndex(input, k){
+    const v=input.value; let seen=0,pos=v.length;
+    for(let i=0;i<v.length;i++){ if(/\d/.test(v[i])) seen++; if(seen>=k){ pos=i+1; break; } }
+    try{ input.setSelectionRange(pos,pos); }catch(e){}
+  }
+
+  // ====== Parse / format (igual que en Carga Masiva) ======
+  // Decimales SOLO si el usuario teclea ',' o '.'
+  function parseMaskedStrictUser(value, allowDecimals, userWantsDecimals){
+    const raw = String(value||'');
+    if(!allowDecimals || !userWantsDecimals){
+      const digits = raw.replace(/[^\d]/g,''); return digits?parseInt(digits,10):0;
+    }
+    const lastSep = Math.max(raw.lastIndexOf(','), raw.lastIndexOf('.'));
+    if(lastSep<0){ const d=raw.replace(/[^\d]/g,''); return d?parseInt(d,10):0; }
+    const left  = raw.slice(0,lastSep).replace(/[^\d]/g,'');
+    const right = raw.slice(lastSep+1).replace(/[^\d]/g,'').slice(0,2);
+    const intN  = left?parseInt(left,10):0;
+    const fracN = right? parseInt(right,10)/Math.pow(10,right.length) : 0;
+    return intN + fracN;
+  }
+  function formatMaskedAuto(n, cur, forceTwo){
+    const loc = localeForCurrency(cur);
+    if(!supportsCents(cur)){
+      return new Intl.NumberFormat(loc,{minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
+    }
+    if(forceTwo){
+      return new Intl.NumberFormat(loc,{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+    }
+    return new Intl.NumberFormat(loc,{minimumFractionDigits:0,maximumFractionDigits:2}).format(n);
+  }
+
+  // ====== FOLIO con "F-" automático (igual que tenías) ======
+  const $folio = document.getElementById('cm_folio');
+  if($folio){
+    const ensurePrefix = ()=>{
+      if($folio.value === '' || $folio.value === 'F-'){
+        $folio.value = 'F-';
+      }else{
+        $folio.value = $folio.value.replace(/^([fF]-?)+/,'F-');
+      }
+      const len = $folio.value.length;
+      try{ $folio.setSelectionRange(len, len); }catch(e){}
+    };
+    $folio.addEventListener('focus', ensurePrefix);
+    $folio.addEventListener('keydown', (e)=>{
+      if (e.key === ' ' || e.code === 'Space'){
+        e.preventDefault();
+        ensurePrefix();
+      }
+    });
+    $folio.addEventListener('input', ()=>{
+      if($folio.value !== ''){
+        $folio.value = $folio.value.replace(/^([fF]-?)+/,'F-');
+      }
+    });
+    $folio.addEventListener('blur', ()=>{
+      if($folio.value === '') $folio.value = 'F-';
+    });
+  }
+
+  // ====== MONTO (misma lógica que Carga Masiva) ======
+  (function(){
+    const $m = document.getElementById('cm_monto');
+    const $p = document.getElementById('monto_fx_preview');
+
+    function wants(){ return $m?.dataset?.hadDecimal === '1'; }
+    function setW(v){ if(!$m) return; if(v) $m.dataset.hadDecimal='1'; else delete $m.dataset.hadDecimal; }
+
+    if($m){
+      // Marca cuando el usuario desea decimales
+      $m.addEventListener('keydown',(e)=>{
+        if(e.key==='.'||e.key===','){ if(supportsCents(currentCur())) setW(true); e.preventDefault(); }
+      });
+      $m.addEventListener('paste',(e)=>{
+        const t=(e.clipboardData?.getData('text')||''); if(/[,.]/.test(t)&&supportsCents(currentCur())) setW(true);
+      });
+    }
+
+    function updatePreviewUSD(){
+      const cur = currentCur();
+      const allow = supportsCents(cur);
+      const n = parseMaskedStrictUser($m.value, allow, wants());
+
+      // Convertir al USD para el preview
+      let outUSD = n;
+      if (window.fxConvertBetween){
+        outUSD = window.fxConvertBetween(n, cur, 'USD');
+      } else if(window.fxConvertAmount && window.NUAMX_FX?.rates?.USD){
+        const fx = window.NUAMX_FX.rates;
+        const clp = n * (fx[cur] || 1);   // n en cur → CLP
+        outUSD = clp / (fx.USD || 1);     // CLP → USD
+      }
+
+      if (window.fxFormat) {
+        $p.textContent = '≈ ' + window.fxFormat(outUSD, 'USD');
+      } else {
+        const v = new Intl.NumberFormat('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}).format(outUSD);
+        $p.textContent = '≈ ' + v + ' USD';
+      }
+    }
+
+    function liveMask(){
+      const cur = currentCur();
+      const allow = supportsCents(cur);
+
+      const old = $m.value;
+      const caret = $m.selectionStart ?? old.length;
+      const wasEnd = (caret === old.length);
+      const kLeft = digitIndexLeftOfCaret(old, caret);
+
+      let n = parseMaskedStrictUser(old, allow, wants());
+      n = allow ? Math.floor(n*100)/100 : Math.trunc(n);
+
+      const neu = formatMaskedAuto(n, cur, false);
+      if(neu !== old){
+        $m.value = neu;
+        requestAnimationFrame(()=>{
+          if (wasEnd){
+            const end = $m.value.length;
+            try{ $m.setSelectionRange(end, end); }catch(e){}
+          }else{
+            const total = ($m.value.match(/\d/g)||[]).length;
+            setCaretByDigitIndex($m, Math.min(Math.max(kLeft,0), total));
+          }
+        });
+      }
+
+      updatePreviewUSD();
+    }
+
+    function onBlur(){
+      const cur = currentCur();
+      const allow = supportsCents(cur);
+      let n = parseMaskedStrictUser($m.value, allow, wants());
+      n = allow ? Math.round(n*100)/100 : Math.trunc(n);
+      $m.value = formatMaskedAuto(n, cur, allow); // si tiene decimales, fija 2; si no, 0
+    }
+
+    if($m && $p){
+      $m.addEventListener('input', liveMask);
+      $m.addEventListener('blur', onBlur);
+
+      document.getElementById('fx_selector')?.addEventListener('change', ()=>{
+        // Si cambias de moneda y la nueva NO tiene decimales, apaga el flag
+        if(!supportsCents(currentCur())) setW(false);
+        liveMask();
+        onBlur();
+      });
+
+      setTimeout(liveMask, 200);
+    }
+  })();
+
+  // ====== Etiquetas de moneda en esta página ======
+  function refreshCurrencyLabels(){
+    const cur = currentCur();
+    document.querySelectorAll('.fx-label').forEach(el=> el.textContent=cur);
+  }
+  refreshCurrencyLabels();
+  document.getElementById('fx_selector')?.addEventListener('change', refreshCurrencyLabels);
+
+})();
+</script>
 {% endblock %}

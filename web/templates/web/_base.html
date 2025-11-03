@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="csrf-token" content="{{ csrf_token }}">
   <link rel="icon" href="{% static 'favicon.ico' %}">
-  <title>NUAMX</title>
+  <title>{% block html_title %}NUAMX{% endblock %}</title>
 
-  <!-- Tailwind (cárgalo solo una vez) -->
+  <!-- Tailwind (solo una vez) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Estilos base -->
@@ -19,13 +19,15 @@
     }
     .btn{background:var(--nuamx);color:#fff;padding:.55rem 1rem;border-radius:.6rem;font-weight:600}
     .btn:hover{background:var(--nuamx-dark)}
-    .btn-ghost{border:1px solid var(--border);padding:.5rem .9rem;border-radius:.6rem}
+    .btn-ghost{border:1px solid var(--border);padding:.5rem .9rem;border-radius:.6rem;background:#fff}
     .card{background:var(--card);border:1px solid var(--border);border-radius:1rem}
     .kpi .label{font-size:.8rem;color:var(--muted)}
     .kpi .value{font-size:1.6rem;font-weight:700}
     .nav a{display:block;padding:.6rem .9rem;border-radius:.6rem}
     .nav a.active{background:#F0FFF6;color:#064F2C;font-weight:600;border:1px solid #D1FAE5}
   </style>
+
+  {% block extra_head %}{% endblock %}
 </head>
 
 <body class="bg-[color:var(--bg)] text-[color:var(--ink)]">
@@ -33,6 +35,16 @@
   <header class="h-16 bg-[color:var(--nuamx)] text-white flex items-center px-5 justify-between">
     <div class="font-semibold tracking-wide">NUAMX</div>
     <div class="flex items-center gap-3 text-sm">
+      <!-- Selector de moneda GLOBAL -->
+      <div class="flex items-center gap-2">
+        <span class="opacity-90">Moneda:</span>
+        <select id="fx_selector" class="text-[color:#064F2C] bg-white/90 rounded px-2 py-1">
+          <option value="CLP">CLP</option>
+          <option value="COP">COP</option>
+          <option value="PEN">PEN</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
       <span class="opacity-90">admin@nuamx.com</span>
       <a class="bg-white/15 px-3 py-1.5 rounded" href="login.html">Salir</a>
     </div>
@@ -44,48 +56,212 @@
       <div class="p-4 text-xs uppercase tracking-wide text-[color:var(--muted)]">Menú</div>
       <nav class="nav px-3 pb-6 space-y-1">
         <a href="dashboard.html">Dashboard</a>
-        <a href="carga-manual.html">Carga manual (RF01)</a>
-        <a href="carga-masiva.html">Carga masiva (RF02)</a>
-        <a href="busqueda.html">Búsqueda / Filtrado (RF03)</a>
-        <a href="detalle.html">Detalle / Edición (RF04)</a>
-        <a href="reportes.html">Reportes (RF05)</a>
-        <a href="no-inscritos.html">No inscritos (RF06)</a>
-        <a href="admin-roles.html">Usuarios / Roles (RNF01)</a>
+        <a href="carga-manual.html">Carga manual</a>
+        <a href="carga-masiva.html">Carga masiva</a>
+        <a href="busqueda.html">Búsqueda / Filtrado</a>
+        <a href="detalle.html">Detalle / Edición</a>
+        <a href="reportes.html">Reportes</a>
+        <a href="no-inscritos.html">No inscritos</a>
+        <a href="admin-roles.html">Usuarios / Roles</a>
       </nav>
     </aside>
 
     <!-- Contenido -->
     <main class="flex-1 p-6 md:p-8">
-      <!-- BREADCRUMB (opcional) -->
-      <div class="text-sm text-[color:var(--muted)] mb-2">Inicio / Sección</div>
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-semibold">TÍTULO</h1>
-        <div class="flex gap-2">
-          <button class="btn-ghost">Ayuda</button>
-          <button class="btn">Acción</button>
-        </div>
+      <div class="text-sm text-[color:var(--muted)] mb-2">{% block breadcrumb %}Inicio / Sección{% endblock %}</div>
+
+      <div class="mb-4">
+        <h1 class="text-2xl font-semibold">
+          {% block page_title %}Dashboard{% endblock %}
+        </h1>
+        {% block page_subtitle %}{% endblock %}
       </div>
 
-      <!-- Aquí cada página puede inyectar su contenido -->
-      {% block content %}
-      <section class="card p-6">Contenido…</section>
-      {% endblock %}
+      {% block content %}{% endblock %}
     </main>
   </div>
 
-  <!-- Script: resaltar enlace activo del menú -->
+  <!-- Activa link del menú -->
   <script>
     (function(){
       const links = document.querySelectorAll('.nav a');
       const path = location.pathname.split('/').pop() || 'dashboard.html';
-      links.forEach(a => {
-        const href = a.getAttribute('href');
-        if (href === path) a.classList.add('active');
-      });
+      links.forEach(a => { if (a.getAttribute('href') === path) a.classList.add('active'); });
     })();
   </script>
 
-  <!-- Script global que controla botones y API -->
-  <script src="{% static 'app.js' %}"></script>
+  <!-- Estado de FX + utilidades globales de formato/enmascarado -->
+  <script>
+    (function(){
+      // ===== Estado global de FX (con persistencia) =====
+      const FX_LS_KEY = 'nuamx_fx_current';
+      const FX_DEFAULT = 'CLP';
+
+      // Crea/recupera objeto global
+      const FX = (window.NUAMX_FX = window.NUAMX_FX || {
+        // Ejemplo de tasas relativas a CLP (ajústalas si luego consumes API real)
+        rates: { CLP: 1, COP: 0.30, PEN: 220, USD: 950 },
+        current: FX_DEFAULT
+      });
+
+      try {
+        const saved = localStorage.getItem(FX_LS_KEY);
+        if (saved) FX.current = saved.toUpperCase();
+      } catch {}
+
+      // Pinta el selector de header
+      const fxSel = document.getElementById('fx_selector');
+      if (fxSel) {
+        fxSel.value = (FX.current || FX_DEFAULT).toUpperCase();
+        fxSel.addEventListener('change', () => {
+          FX.current = (fxSel.value || FX_DEFAULT).toUpperCase();
+          try { localStorage.setItem(FX_LS_KEY, FX.current); } catch {}
+          // Notifica a todas las páginas/componentes
+          document.dispatchEvent(new CustomEvent('nuamx:fx-changed', { detail: { code: FX.current } }));
+          // Rebind de inputs de dinero
+          document.dispatchEvent(new CustomEvent('nuamx:rebind-money'));
+          // Actualiza etiquetas <span class="fx-label">
+          document.querySelectorAll('.fx-label').forEach(el => el.textContent = FX.current);
+        });
+      }
+
+      // Inicializa etiquetas de moneda al cargar la página
+      document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.fx-label').forEach(el => el.textContent = (FX.current || FX_DEFAULT).toUpperCase());
+      });
+
+      // ===== Helpers de moneda disponibles globalmente =====
+      window.fxSupportsCents = function(code){
+        const c = String(code||FX.current||FX_DEFAULT).toUpperCase();
+        // CLP/COP sin decimales, USD/PEN con 2 decimales
+        return (c === 'USD' || c === 'PEN');
+      };
+
+      window.fxFormat = function(amount, code){
+        const c = (code || FX.current || FX_DEFAULT).toUpperCase();
+        const hasCents = window.fxSupportsCents(c);
+        return new Intl.NumberFormat('es-CL', {
+          minimumFractionDigits: hasCents ? 2 : 0,
+          maximumFractionDigits: hasCents ? 2 : 0
+        }).format(Number(amount||0));
+      };
+
+      // Convierte entre monedas usando rates relativos a CLP (simple)
+      window.fxConvertBetween = function(n, fromCode, toCode){
+        const fx = FX.rates || {};
+        const from = (fromCode||FX.current||FX_DEFAULT).toUpperCase();
+        const to   = (toCode||FX_DEFAULT).toUpperCase();
+        // Pasamos a CLP y luego a destino
+        const clp = Number(n||0) * (fx[from] || 1);
+        return clp / (fx[to] || 1);
+      };
+
+      // ===== Enmascarado de inputs .money-input (en vivo) =====
+      function digitIndexLeftOfCaret(value, caret){
+        let count = 0;
+        for(let i=0;i<Math.min(caret, value.length); i++){
+          if(/\d/.test(value[i])) count++;
+        }
+        return count;
+      }
+      function setCaretByDigitIndex(input, k){
+        const v = input.value;
+        let seen = 0, pos = v.length;
+        for(let i=0;i<v.length;i++){
+          if(/\d/.test(v[i])) seen++;
+          if(seen >= k){ pos = i+1; break; }
+        }
+        try{ input.setSelectionRange(pos, pos); }catch(e){}
+      }
+
+      function parseMaskedAuto(value, allowDecimals){
+        const raw = String(value || '');
+        if(!allowDecimals){
+          const digits = raw.replace(/[^\d]/g,'');
+          return digits ? parseInt(digits,10) : 0;
+        }
+        const lastSep = Math.max(raw.lastIndexOf(','), raw.lastIndexOf('.'));
+        if(lastSep<0){
+          const digits = raw.replace(/[^\d]/g,'');
+          return digits ? parseInt(digits,10) : 0;
+        }
+        const left  = raw.slice(0,lastSep).replace(/[^\d]/g,'');
+        const right = raw.slice(lastSep+1).replace(/[^\d]/g,'').slice(0,2);
+        const intN  = left?parseInt(left,10):0;
+        const fracN = right?parseInt(right,10)/Math.pow(10,right.length):0;
+        return intN+fracN;
+      }
+
+      function formatMaskedAuto(n, cur, forceTwoDec){
+        if(!window.fxSupportsCents(cur)){
+          return new Intl.NumberFormat('es-CL', {minimumFractionDigits:0, maximumFractionDigits:0}).format(n);
+        }
+        if(forceTwoDec){
+          return new Intl.NumberFormat('es-CL', {minimumFractionDigits:2, maximumFractionDigits:2}).format(n);
+        }
+        return new Intl.NumberFormat('es-CL', {minimumFractionDigits:0, maximumFractionDigits:2}).format(n);
+      }
+
+      function bindMoneyInput(el){
+        function liveMask(){
+          const cur = (FX.current||FX_DEFAULT).toUpperCase();
+          const allowDec = window.fxSupportsCents(cur);
+
+          const oldVal = el.value;
+          const caret  = el.selectionStart ?? oldVal.length;
+          const kDigitsLeft = digitIndexLeftOfCaret(oldVal, caret);
+
+          let n = parseMaskedAuto(oldVal, allowDec);
+          if(allowDec){
+            n = Math.floor(n * 100) / 100;
+          }else{
+            n = Math.trunc(n);
+          }
+
+          const newVal = formatMaskedAuto(n, cur, false);
+          if(newVal !== oldVal){
+            el.value = newVal;
+            const totalDigits = (newVal.match(/\d/g)||[]).length;
+            const k = Math.min(Math.max(kDigitsLeft, 0), totalDigits);
+            setCaretByDigitIndex(el, k);
+          }
+        }
+        function onBlur(){
+          const cur = (FX.current||FX_DEFAULT).toUpperCase();
+          const allowDec = window.fxSupportsCents(cur);
+          let n = parseMaskedAuto(el.value, allowDec);
+          if(allowDec){
+            n = Math.round(n * 100) / 100;
+            el.value = formatMaskedAuto(n, cur, true);
+          }else{
+            n = Math.trunc(n);
+            el.value = formatMaskedAuto(n, cur, false);
+          }
+        }
+        el.removeEventListener('input', el.__money_input_listener__);
+        el.removeEventListener('blur', el.__money_blur_listener__);
+        el.__money_input_listener__ = liveMask;
+        el.__money_blur_listener__  = onBlur;
+        el.addEventListener('input', liveMask);
+        el.addEventListener('blur', onBlur);
+        // Inicial
+        setTimeout(liveMask, 0);
+      }
+
+      function rebindAllMoneyInputs(){
+        document.querySelectorAll('input.money-input').forEach(bindMoneyInput);
+        // Actualiza todas las etiquetas de moneda visibles
+        document.querySelectorAll('.fx-label').forEach(el => el.textContent = (FX.current||FX_DEFAULT).toUpperCase());
+      }
+
+      document.addEventListener('DOMContentLoaded', rebindAllMoneyInputs);
+      document.addEventListener('nuamx:rebind-money', rebindAllMoneyInputs);
+      document.addEventListener('nuamx:fx-changed', rebindAllMoneyInputs);
+    })();
+  </script>
+
+  <!-- Script global (tu app) -->
+  <script src="{% static 'app.js' %}?v=5"></script>
+  {% block extra_js %}{% endblock %}
 </body>
 </html>

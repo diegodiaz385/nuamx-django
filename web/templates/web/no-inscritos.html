@@ -2,8 +2,8 @@
 
 {% block content %}
 <section class="card p-6 space-y-4">
-  <h2 class="text-xl font-semibold">No inscritos (RF06)</h2>
-  <p class="text-[color:var(--muted)]">Listado de registros pendientes de inscripción / validación.</p>
+  <h2 class="text-xl font-semibold">Instrumentos no inscritos</h2>
+  <p class="text-sm text-gray-500 mt-1">Administra documentos tributarios sin inscripción y su estado.</p>
 
   <div class="flex gap-2">
     <button class="btn" data-api="roles">🔄 Actualizar lista (demo)</button>
@@ -14,17 +14,21 @@
     <thead class="bg-gray-50">
       <tr>
         <th class="text-left p-3">RUT</th>
-        <th class="text-left p-3">Nombre</th>
-        <th class="text-left p-3">Programa</th>
+        <th class="text-left p-3">Razón social</th>
+        <th class="text-left p-3">Tipo</th>
+        <th class="text-left p-3">Folio</th>
+        <th class="text-left p-3">Monto</th>
         <th class="text-left p-3">Estado</th>
       </tr>
     </thead>
     <tbody>
-      <tr class="border-t">
-        <td class="p-3">22.222.222-2</td>
-        <td class="p-3">María López</td>
-        <td class="p-3">Salud</td>
-        <td class="p-3"><span class="px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs">Pendiente</span></td>
+      <tr class="border-b last:border-0">
+        <td class="p-3">11.111.111-1</td>
+        <td class="p-3">Ejemplo SpA</td>
+        <td class="p-3">Factura</td>
+        <td class="p-3">123456</td>
+        <td class="p-3">$1.500.000</td>
+        <td class="p-3"><span class="px-2 py-1 bg-yellow-50 text-yellow-700 rounded">Pendiente</span></td>
       </tr>
     </tbody>
   </table>

@@ -1,21 +1,365 @@
 {% extends "web/_base.html" %}
 
+{% block html_title %}NUAMX – Detalle / Edición{% endblock %}
+{% block page_title %}Detalle / Edición{% endblock %}
+{% block page_subtitle %}
+<div class="muted">Revisa y edita un registro. Puedes guardar, duplicar, eliminar o exportar a CSV.</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ===== LAYOUT NUEVO (FLEX) ===== */
+  .layout{
+    display:flex;
+    gap:14px;
+    width:100%;
+    align-items:flex-start;
+  }
+  .main-col{
+    flex:1 1 0;           /* ocupa todo el espacio disponible */
+    min-width:0;          /* permite que el contenido se encoja sin empujar */
+  }
+  .side-col{
+    flex:0 0 360px;       /* ancho fijo agradable */
+    max-width:420px;
+    min-width:300px;
+  }
+  @media (max-width: 980px){
+    .layout{flex-direction:column;}
+    .side-col{flex:0 0 auto; width:100%; max-width:none; min-width:0;}
+  }
+
+  /* Evitar que las cards “empujen” el layout */
+  .card{ min-width:0; }
+
+  .field{display:flex;flex-direction:column;gap:6px}
+  .label{font-weight:600}
+  .input,.select,.textarea{border:1px solid #e5e7eb;border-radius:10px;padding:10px;font:inherit}
+  .textarea{min-height:90px;resize:vertical}
+  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  @media (max-width: 980px){ .grid2{grid-template-columns:1fr} }
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .badge{display:inline-block;border:1px solid #e5e7eb;border-radius:8px;padding:3px 8px;font-size:.85rem}
+  .ok{color:#065f46;background:#e8fff2;border-color:#c9f0da}
+  .warn{color:#92400e;background:#fff7ed;border-color:#fdebd3}
+  .err{color:#991b1b;background:#fee2e2;border-color:#fecaca}
+  .kv{display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px;align-items:center}
+  .kv .k{color:#6b7280}
+  .divider{height:1px;background:#e5e7eb;margin:12px 0}
+  .mini{font-size:.9rem;color:#6b7280}
+</style>
+{% endblock %}
+
 {% block content %}
-<section class="card p-6 space-y-4">
-  <h2 class="text-xl font-semibold">Detalle / Edición (RF04)</h2>
-
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <input class="border p-2 rounded" placeholder="RUT / ID" value="11.111.111-1">
-    <input class="border p-2 rounded" placeholder="Nombre completo" value="Juan Pérez">
-    <input class="border p-2 rounded" placeholder="Programa" value="Ingeniería">
-    <input class="border p-2 rounded" placeholder="Jornada" value="Diurna">
-    <input class="border p-2 rounded" placeholder="Calificación" value="6.1">
-    <input class="border p-2 rounded" placeholder="Periodo" value="2025-02">
+<!-- Encabezado / atajos -->
+<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+  <div class="muted">Inicio / Detalle</div>
+  <div class="actions">
+    <a href="busqueda.html" class="btn-ghost">← Volver a búsqueda</a>
+    <button class="btn-ghost" type="button" data-api="detail:export">Exportar CSV</button>
+    <button class="btn" type="button" data-api="detail:save">💾 Guardar</button>
   </div>
+</div>
 
-  <div class="flex gap-2">
-    <button class="btn" data-api="ping">💾 Guardar cambios (demo)</button>
-    <button class="btn-ghost">Volver</button>
-  </div>
-</section>
+<div class="layout">
+  <!-- COLUMNA PRINCIPAL -->
+  <section class="card main-col" aria-labelledby="edit-title">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="edit-title" style="margin:0">Editar registro</h3>
+      <span id="status_badge" class="badge" style="display:none"></span>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label class="label" for="f_rut">RUT / ID</label>
+        <input class="input" id="f_rut" placeholder="11.111.111-1">
+      </div>
+      <div class="field">
+        <label class="label" for="f_razon">Razón social</label>
+        <input class="input" id="f_razon" placeholder="Ejemplo SpA">
+      </div>
+
+      <div class="field">
+        <label class="label" for="f_periodo">Período</label>
+        <input class="input" id="f_periodo" placeholder="YYYY-MM (ej: 2025-02)">
+      </div>
+      <div class="field">
+        <label class="label" for="f_tipo">Tipo</label>
+        <select class="select" id="f_tipo">
+          <option value="">Seleccionar</option>
+          <option>Factura</option>
+          <option>Boleta</option>
+          <option>Nota de crédito</option>
+          <option>Otro</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="f_folio">Folio / N° Doc</label>
+        <input class="input" id="f_folio" placeholder="123456">
+      </div>
+      <div class="field">
+        <label class="label" for="f_monto">Monto</label>
+        <input type="number" class="input" id="f_monto" placeholder="1500000" min="0" step="1">
+      </div>
+
+      <div class="field">
+        <label class="label" for="f_estado">Estado validación</label>
+        <select class="select" id="f_estado">
+          <option value="">Seleccionar</option>
+          <option>Válida</option>
+          <option>Con advertencias</option>
+          <option>Rechazada</option>
+        </select>
+      </div>
+
+      <div class="field" style="grid-column:1/-1">
+        <label class="label" for="f_obs">Observaciones</label>
+        <textarea class="textarea" id="f_obs" placeholder="Detalle opcional..."></textarea>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="actions">
+      <button class="btn" type="button" data-api="detail:save">💾 Guardar</button>
+      <button class="btn-ghost" type="button" data-api="detail:duplicate">Duplicar</button>
+      <button class="btn-ghost" type="button" data-api="detail:delete">Eliminar</button>
+      <button class="btn-ghost" type="button" data-api="detail:export">Exportar CSV</button>
+    </div>
+    <div class="mini" style="margin-top:6px" id="save_hint"></div>
+  </section>
+
+  <!-- COLUMNA LATERAL -->
+  <aside class="card side-col" aria-labelledby="audit-title">
+    <h3 id="audit-title" style="margin:0 0 8px 0">Resumen / Auditoría</h3>
+    <div class="kv"><div class="k">ID interno</div><div id="kv_id">—</div></div>
+    <div class="kv"><div class="k">Creado</div><div id="kv_created">—</div></div>
+    <div class="kv"><div class="k">Modificado</div><div id="kv_updated">—</div></div>
+    <div class="kv"><div class="k">Usuario</div><div id="kv_user">admin@nuamx.com</div></div>
+    <div class="divider"></div>
+    <div class="kv"><div class="k">Período</div><div id="kv_periodo">—</div></div>
+    <div class="kv"><div class="k">Tipo</div><div id="kv_tipo">—</div></div>
+    <div class="kv"><div class="k">Estado</div><div id="kv_estado">—</div></div>
+    <div class="kv"><div class="k">Monto</div><div id="kv_monto">—</div></div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // ===== Utilidades =====
+  const $ = (s,c=document)=>c.querySelector(s);
+  const fmtCL = (n)=>Number(n||0).toLocaleString('es-CL');
+  const LS_KEY = "nuamx_manual_v1";
+
+  function getParam(name){
+    const m = new URLSearchParams(location.search).get(name);
+    return (m===null?null:String(m));
+  }
+  function nowStr(){
+    const d = new Date();
+    const f = d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const t = d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    return `${f} ${t}`;
+  }
+  function uid(){ return 'id_' + Math.random().toString(36).slice(2,8) + Date.now().toString(36); }
+
+  function loadHist(){
+    try{ const raw = localStorage.getItem(LS_KEY); const arr = raw?JSON.parse(raw):[]; return Array.isArray(arr)?arr:[]; }
+    catch{ return []; }
+  }
+  function saveHist(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr||[])); }
+
+  // ===== Estado del registro =====
+  let INDEX = null;   // índice dentro del historial (si vino desde búsqueda)
+  let RECORD = null;  // objeto en edición
+
+  function demoRecord(){
+    return {
+      _id: uid(),
+      ts: nowStr(),
+      created_at: nowStr(),
+      updated_at: nowStr(),
+      rut:"11.111.111-1",
+      razon:"Ejemplo SpA",
+      periodo:"2025-08",
+      tipo:"Factura",
+      folio:"1001",
+      monto:1200000,
+      estado:"Válida",
+      obs:"OK"
+    };
+  }
+
+  function loadRecord(){
+    const idxParam = getParam('idx');
+    const hist = loadHist();
+
+    if(idxParam!==null){
+      const idx = Number(idxParam);
+      if(!isNaN(idx) && hist[idx]){
+        INDEX = idx;
+        RECORD = Object.assign({}, hist[idx]);
+        if(!RECORD._id) RECORD._id = uid();
+        if(!RECORD.created_at) RECORD.created_at = hist[idx].ts || nowStr();
+        if(!RECORD.updated_at) RECORD.updated_at = nowStr();
+        return;
+      }
+    }
+    INDEX = null;
+    RECORD = demoRecord();
+  }
+
+  function renderForm(){
+    if(!RECORD) return;
+    $('#f_rut').value    = RECORD.rut    || '';
+    $('#f_razon').value  = RECORD.razon  || '';
+    $('#f_periodo').value= RECORD.periodo|| '';
+    $('#f_tipo').value   = RECORD.tipo   || '';
+    $('#f_folio').value  = RECORD.folio  || '';
+    $('#f_monto').value  = RECORD.monto  ?? '';
+    $('#f_estado').value = RECORD.estado || '';
+    $('#f_obs').value    = RECORD.obs    || '';
+
+    $('#kv_id').textContent       = RECORD._id || '—';
+    $('#kv_created').textContent  = RECORD.created_at || (RECORD.ts || '—');
+    $('#kv_updated').textContent  = RECORD.updated_at || '—';
+    $('#kv_periodo').textContent  = RECORD.periodo || '—';
+    $('#kv_tipo').textContent     = RECORD.tipo || '—';
+    $('#kv_estado').textContent   = RECORD.estado || '—';
+    $('#kv_monto').textContent    = (RECORD.monto!==undefined)?('$ ' + fmtCL(RECORD.monto)):'—';
+  }
+
+  function statusBadge(text, kind){
+    const el = $('#status_badge'); if(!el) return;
+    if(!text){ el.style.display='none'; return; }
+    el.textContent = text; el.className='badge';
+    if(kind==='ok') el.classList.add('ok');
+    if(kind==='warn') el.classList.add('warn');
+    if(kind==='err') el.classList.add('err');
+    el.style.display='';
+    setTimeout(()=>{ el.style.display='none'; }, 1800);
+  }
+
+  function collect(){
+    const data = {
+      rut:    $('#f_rut').value.trim(),
+      razon:  $('#f_razon').value.trim(),
+      periodo:$('#f_periodo').value.trim(),
+      tipo:   $('#f_tipo').value.trim(),
+      folio:  $('#f_folio').value.trim(),
+      monto:  $('#f_monto').value.trim(),
+      estado: $('#f_estado').value.trim(),
+      obs:    $('#f_obs').value.trim()
+    };
+    const errs = [];
+    if(!data.rut) errs.push('RUT/ID');
+    if(!data.razon) errs.push('Razón social');
+    if(!/^\d{4}-\d{2}$/.test(data.periodo||'')) errs.push('Período (YYYY-MM)');
+    if(!data.tipo) errs.push('Tipo');
+    if(!data.folio) errs.push('Folio');
+    if(isNaN(Number(data.monto)) || Number(data.monto)<0) errs.push('Monto');
+    if(!data.estado) errs.push('Estado');
+
+    return {ok: errs.length===0, errs, data};
+  }
+
+  function doSave(){
+    const res = collect();
+    if(!res.ok){ statusBadge('Completa: '+res.errs.join(', '), 'err'); return; }
+
+    const hist = loadHist();
+    const now  = nowStr();
+
+    RECORD = {
+      ...RECORD,
+      ...res.data,
+      monto: Number(res.data.monto||0),
+      updated_at: now,
+    };
+    if(!RECORD._id) RECORD._id = uid();
+    if(!RECORD.created_at) RECORD.created_at = now;
+    if(!RECORD.ts) RECORD.ts = RECORD.created_at;
+
+    if(INDEX!==null){
+      hist[INDEX] = RECORD;
+    }else{
+      hist.unshift({ ...RECORD, ts: now });
+      INDEX = 0;
+    }
+
+    localStorage.setItem(LS_KEY, JSON.stringify(hist));
+    renderForm();
+    statusBadge('Guardado', 'ok');
+    $('#save_hint').textContent = `Último guardado: ${now}`;
+  }
+
+  function doDuplicate(){
+    const res = collect();
+    if(!res.ok){ statusBadge('Completa campos antes de duplicar', 'warn'); return; }
+    const now = nowStr();
+    const copy = {
+      _id: uid(),
+      ts: now,
+      created_at: now,
+      updated_at: now,
+      ...RECORD,
+      ...res.data,
+      monto: Number(res.data.monto||0),
+      obs: (res.data.obs||RECORD.obs||'') + ''
+    };
+    const hist = loadHist();
+    hist.unshift(copy);
+    localStorage.setItem(LS_KEY, JSON.stringify(hist));
+    statusBadge('Duplicado creado', 'ok');
+  }
+
+  function doDelete(){
+    if(INDEX===null){ statusBadge('Este registro es de ejemplo', 'warn'); return; }
+    if(!confirm('¿Eliminar este registro?')) return;
+    const hist = loadHist();
+    if(hist[INDEX]){
+      hist.splice(INDEX,1);
+      localStorage.setItem(LS_KEY, JSON.stringify(hist));
+      statusBadge('Eliminado', 'ok');
+      setTimeout(()=>{ location.href='busqueda.html'; }, 350);
+    }
+  }
+
+  function doExport(){
+    const res = collect();
+    if(!res.ok){ statusBadge('Completa el registro para exportar', 'warn'); return; }
+    const rows = [
+      ['fecha','rut','razon_social','periodo','tipo_instrumento','folio','monto','estado_validacion','observaciones','id_interno'],
+      [RECORD.ts||RECORD.created_at||nowStr(), res.data.rut, res.data.razon, res.data.periodo, res.data.tipo, res.data.folio, res.data.monto, res.data.estado, res.data.obs||'', RECORD._id||'']
+    ];
+    const csv = rows.map(r=>r.map(v=>{
+      const s=String(v??'');
+      return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+    }).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='detalle_registro.csv';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    statusBadge('CSV exportado', 'ok');
+  }
+
+  document.addEventListener('click', (e)=>{
+    const b = e.target.closest('[data-api]'); if(!b) return;
+    e.preventDefault();
+    const api = b.getAttribute('data-api');
+    if(api==='detail:save')      return doSave();
+    if(api==='detail:duplicate') return doDuplicate();
+    if(api==='detail:delete')    return doDelete();
+    if(api==='detail:export')    return doExport();
+  });
+
+  // Init
+  loadRecord();
+  renderForm();
+  $('#save_hint').textContent = RECORD.updated_at ? `Última modificación: ${RECORD.updated_at}` : '';
+})();
+</script>
 {% endblock %}
