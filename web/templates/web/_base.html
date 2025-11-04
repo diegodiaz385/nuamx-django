@@ -8,11 +8,10 @@
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <title>{% block html_title %}NUAMX{% endblock %}</title>
 
-  <!-- Tailwind (solo una vez) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Estilos base -->
   <style>
+    /* ... (Estilos CSS) ... */
     :root{
       --nuamx:#0A6A3B; --nuamx-dark:#064F2C;
       --ink:#1F2937; --muted:#6B7280; --bg:#F8FAFC; --card:#FFFFFF; --border:#E5E7EB;
@@ -31,11 +30,9 @@
 </head>
 
 <body class="bg-[color:var(--bg)] text-[color:var(--ink)]">
-  <!-- Header -->
   <header class="h-16 bg-[color:var(--nuamx)] text-white flex items-center px-5 justify-between">
     <div class="font-semibold tracking-wide">NUAMX</div>
     <div class="flex items-center gap-3 text-sm">
-      <!-- Selector de moneda GLOBAL -->
       <div class="flex items-center gap-2">
         <span class="opacity-90">Moneda:</span>
         <select id="fx_selector" class="text-[color:#064F2C] bg-white/90 rounded px-2 py-1">
@@ -45,28 +42,28 @@
           <option value="USD">USD</option>
         </select>
       </div>
-      <span class="opacity-90">admin@nuamx.com</span>
-      <a class="bg-white/15 px-3 py-1.5 rounded" href="login.html">Salir</a>
+
+      <span id="user-email" class="opacity-90">user@nuamx.com</span>
+
+      <a id="logout-btn" class="bg-white/15 px-3 py-1.5 rounded cursor-pointer">Salir</a>
     </div>
   </header>
 
   <div class="flex">
-    <!-- Sidebar -->
     <aside class="hidden md:block w-68 min-w-[260px] min-h-[calc(100vh-4rem)] bg-white border-r">
       <div class="p-4 text-xs uppercase tracking-wide text-[color:var(--muted)]">Menú</div>
       <nav class="nav px-3 pb-6 space-y-1">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="carga-manual.html">Carga manual</a>
-        <a href="carga-masiva.html">Carga masiva</a>
-        <a href="busqueda.html">Búsqueda / Filtrado</a>
-        <a href="detalle.html">Detalle / Edición</a>
-        <a href="reportes.html">Reportes</a>
-        <a href="no-inscritos.html">No inscritos</a>
-        <a href="admin-roles.html">Usuarios / Roles</a>
+        <a href="{% url 'dashboard' %}">Dashboard</a>
+        <a href="{% url 'carga-manual' %}">Carga manual</a>
+        <a href="{% url 'carga-masiva' %}">Carga masiva</a>
+        <a href="{% url 'busqueda' %}">Búsqueda / Filtrado</a>
+        <a href="{% url 'detalle' %}">Detalle / Edición</a>
+        <a href="{% url 'reportes' %}">Reportes</a>
+        <a href="{% url 'no-inscritos' %}">No inscritos</a>
+        <a href="{% url 'admin-roles' %}">Usuarios / Roles</a>
       </nav>
     </aside>
 
-    <!-- Contenido -->
     <main class="flex-1 p-6 md:p-8">
       <div class="text-sm text-[color:var(--muted)] mb-2">{% block breadcrumb %}Inicio / Sección{% endblock %}</div>
 
@@ -81,25 +78,88 @@
     </main>
   </div>
 
-  <!-- Activa link del menú -->
   <script>
     (function(){
       const links = document.querySelectorAll('.nav a');
-      const path = location.pathname.split('/').pop() || 'dashboard.html';
-      links.forEach(a => { if (a.getAttribute('href') === path) a.classList.add('active'); });
+      const path = location.pathname.replace(/\/+$/, '').split('/').pop() || 'dashboard'; 
+      links.forEach(a => { 
+          const hrefPath = a.getAttribute('href').replace(/\/+$/, '').split('/').pop();
+          if (hrefPath === path) a.classList.add('active'); 
+      });
     })();
   </script>
 
-  <!-- Estado de FX + utilidades globales de formato/enmascarado -->
+  <script>
+    (function () {
+      const loginUrl = "{% url 'login' %}";
+      const tokenRefreshUrl = "{% url 'token_refresh' %}";
+
+      const publicPaths = ['/login/', '/register/']; 
+      const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
+      const access = localStorage.getItem('access');
+
+      if (!isPublic && !access) {
+        location.href = loginUrl; 
+        return;
+      }
+
+      async function refreshTokenOnce() {
+        const r = localStorage.getItem('refresh');
+        if (!r) return null;
+        const res = await fetch(tokenRefreshUrl, { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh: r })
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data?.access) {
+          localStorage.setItem('access', data.access);
+          document.cookie = `access=${data.access}; Path=/; SameSite=Lax`;
+          return data.access;
+        }
+        return null;
+      }
+
+      window.authFetch = async (url, opts = {}) => {
+        const token = localStorage.getItem('access');
+        opts.headers = Object.assign({}, opts.headers, { 'Authorization': 'Bearer ' + token });
+        let res = await fetch(url, opts);
+        if (res.status === 401) {
+          const newToken = await refreshTokenOnce();
+          if (newToken) {
+            opts.headers['Authorization'] = 'Bearer ' + newToken;
+            res = await fetch(url, opts);
+          } else {
+            forceLogout();
+          }
+        }
+        return res;
+      };
+
+      const meData = JSON.parse(localStorage.getItem('me') || '{}');
+      const emailEl = document.getElementById('user-email');
+      if (emailEl && meData.email) emailEl.textContent = meData.email;
+
+      function forceLogout() {
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        localStorage.removeItem('me');
+        document.cookie = 'access=; Max-Age=0; Path=/; SameSite=Lax';
+        location.href = loginUrl; 
+      }
+
+      const logoutBtn = document.getElementById('logout-btn');
+      if (logoutBtn) logoutBtn.addEventListener('click', forceLogout);
+    })();
+  </script>
+
   <script>
     (function(){
-      // ===== Estado global de FX (con persistencia) =====
       const FX_LS_KEY = 'nuamx_fx_current';
       const FX_DEFAULT = 'CLP';
 
-      // Crea/recupera objeto global
       const FX = (window.NUAMX_FX = window.NUAMX_FX || {
-        // Ejemplo de tasas relativas a CLP (ajústalas si luego consumes API real)
         rates: { CLP: 1, COP: 0.30, PEN: 220, USD: 950 },
         current: FX_DEFAULT
       });
@@ -109,31 +169,24 @@
         if (saved) FX.current = saved.toUpperCase();
       } catch {}
 
-      // Pinta el selector de header
       const fxSel = document.getElementById('fx_selector');
       if (fxSel) {
         fxSel.value = (FX.current || FX_DEFAULT).toUpperCase();
         fxSel.addEventListener('change', () => {
           FX.current = (fxSel.value || FX_DEFAULT).toUpperCase();
           try { localStorage.setItem(FX_LS_KEY, FX.current); } catch {}
-          // Notifica a todas las páginas/componentes
           document.dispatchEvent(new CustomEvent('nuamx:fx-changed', { detail: { code: FX.current } }));
-          // Rebind de inputs de dinero
           document.dispatchEvent(new CustomEvent('nuamx:rebind-money'));
-          // Actualiza etiquetas <span class="fx-label">
           document.querySelectorAll('.fx-label').forEach(el => el.textContent = FX.current);
         });
       }
 
-      // Inicializa etiquetas de moneda al cargar la página
       document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.fx-label').forEach(el => el.textContent = (FX.current || FX_DEFAULT).toUpperCase());
       });
 
-      // ===== Helpers de moneda disponibles globalmente =====
       window.fxSupportsCents = function(code){
         const c = String(code||FX.current||FX_DEFAULT).toUpperCase();
-        // CLP/COP sin decimales, USD/PEN con 2 decimales
         return (c === 'USD' || c === 'PEN');
       };
 
@@ -146,17 +199,14 @@
         }).format(Number(amount||0));
       };
 
-      // Convierte entre monedas usando rates relativos a CLP (simple)
       window.fxConvertBetween = function(n, fromCode, toCode){
         const fx = FX.rates || {};
         const from = (fromCode||FX.current||FX_DEFAULT).toUpperCase();
         const to   = (toCode||FX_DEFAULT).toUpperCase();
-        // Pasamos a CLP y luego a destino
         const clp = Number(n||0) * (fx[from] || 1);
         return clp / (fx[to] || 1);
       };
 
-      // ===== Enmascarado de inputs .money-input (en vivo) =====
       function digitIndexLeftOfCaret(value, caret){
         let count = 0;
         for(let i=0;i<Math.min(caret, value.length); i++){
@@ -250,7 +300,6 @@
 
       function rebindAllMoneyInputs(){
         document.querySelectorAll('input.money-input').forEach(bindMoneyInput);
-        // Actualiza todas las etiquetas de moneda visibles
         document.querySelectorAll('.fx-label').forEach(el => el.textContent = (FX.current||FX_DEFAULT).toUpperCase());
       }
 
@@ -259,8 +308,7 @@
       document.addEventListener('nuamx:fx-changed', rebindAllMoneyInputs);
     })();
   </script>
-
-  <!-- Script global (tu app) -->
+  
   <script src="{% static 'app.js' %}?v=5"></script>
   {% block extra_js %}{% endblock %}
 </body>

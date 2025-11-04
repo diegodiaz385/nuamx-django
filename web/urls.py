@@ -1,17 +1,20 @@
 # web/urls.py
+
 from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("", views.dashboard_view, name="home"),  # raíz → dashboard (ajústalo si quieres login)
-    path("login.html", views.login_view, name="login"),
+    # Ruta de Registro
+    path('register/', views.register_view, name='register'),  # <--- ESTA ES LA RUTA QUE FALTABA
 
-    path("dashboard.html", views.dashboard_view, name="dashboard"),
-    path("carga-manual.html", views.carga_manual_view, name="carga_manual"),
-    path("carga-masiva.html", views.carga_masiva_view, name="carga_masiva"),
-    path("busqueda.html", views.busqueda_view, name="busqueda"),
-    path("detalle.html", views.detalle_view, name="detalle"),
-    path("reportes.html", views.reportes_view, name="reportes"),
-    path("no-inscritos.html", views.no_inscritos_view, name="no_inscritos"),
-    path("admin-roles.html", views.admin_roles_view, name="admin_roles"),
+    # Tus rutas existentes:
+    path('login/', views.login_view, name='login'),
+    path('dashboard/', views.dashboard_view, name='dashboard'),
+    path('carga-manual/', views.carga_manual_view, name='carga-manual'),
+    path('carga-masiva/', views.carga_masiva_view, name='carga-masiva'),
+    path('busqueda/', views.busqueda_view, name='busqueda'),
+    path('detalle/', views.detalle_view, name='detalle'),
+    path('reportes/', views.reportes_view, name='reportes'),
+    path('no-inscritos/', views.no_inscritos_view, name='no-inscritos'),
+    path('admin-roles/', views.admin_roles_view, name='admin-roles'),
 ]

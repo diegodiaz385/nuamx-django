@@ -8,209 +8,239 @@
 
 {% block extra_head %}
 <style>
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .input,.select{border:1px solid #e5e7eb;border-radius:10px;padding:10px;font:inherit}
-  .table-wrap{overflow:auto}
-  .muted{color:#6b7280}
-  .toast{position:fixed;right:16px;bottom:16px;background:#0A6A3B;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.12);font-weight:600}
-  .toast.warn{background:#92400e}
-  .toast.err{background:#991b1b}
-  table{width:100%;border-collapse:collapse}
-  th,td{padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:middle}
-  thead th{background:#f8fafc;font-weight:600}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .input,.select{border:1px solid #e5e7eb;border-radius:10px;padding:10px;font:inherit}
+    .table-wrap{overflow:auto}
+    .muted{color:#6b7280}
+    .toast{position:fixed;right:16px;bottom:16px;background:#0A6A3B;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.12);font-weight:600}
+    .toast.warn{background:#92400e}
+    .toast.err{background:#991b1b}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:middle}
+    thead th{background:#f8fafc;font-weight:600}
 </style>
 {% endblock %}
 
 {% block content %}
 <section class="card p-6 space-y-4">
-  <div class="row">
-    <input id="email" class="input" placeholder="Correo (ej: user@dominio.com)" style="min-width:280px">
-    <select id="role" class="select"></select>
-    <button class="btn" id="btn_add" type="button">➕ Asignar</button>
-    <button class="btn-ghost" id="btn_export" type="button">⬇ Exportar CSV</button>
-  </div>
+    <div class="row">
+        <input id="email" class="input" placeholder="Correo (ej: user@dominio.com)" style="min-width:280px">
+        <select id="role" class="select"></select>
+        <button class="btn" id="btn_add" type="button">➕ Asignar</button>
+        <button class="btn-ghost" id="btn_export" type="button">⬇ Exportar CSV</button>
+    </div>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Email</th><th>Rol</th><th>Creado</th><th>Actualizado</th><th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Email</th><th>Rol</th><th>Creado</th><th>Actualizado</th><th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </div>
 </section>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 (function(){
-  // ====== Config ======
-  const API = {
-    roles: "/api/roles/",
-    users: "/api/users/"
-  };
+    // Función de formato de fecha segura contra valores nulos
+    const fmt = v => v ? new Date(v).toLocaleString("es-CL") : "—"; // 🚨 Ajuste 3
 
-  // Fallback silencioso si la API no devuelve roles
-  const DEFAULT_ROLES = [
-    { id: 1, name: "Administrador" },
-    { id: 2, name: "Analista" },
-    { id: 3, name: "Lectura" }
-  ];
+    // ====== Config - RUTAS CORREGIDAS ======
+    const API = {
+        roles: "{% url 'api_roles' %}",
+        users: "{% url 'api_users_list' %}",
+        assign: "{% url 'api_roles_assign' %}",
+    };
 
-  // ====== Utils ======
-  const $ = sel => document.querySelector(sel);
-  const csrfToken = (()=>{
-    const meta = document.querySelector('meta[name="csrf-token"]');
-    return meta ? meta.getAttribute('content') : '';
-  })();
+    // Fallback silencioso si la API no devuelve roles
+    const DEFAULT_ROLES = [
+        { id: 1, name: "Administrador" },
+        { id: 2, name: "Analista" },
+        { id: 3, name: "Lectura" }
+    ];
 
-  function toast(msg, kind){
-    const t = document.createElement('div');
-    t.className = 'toast' + (kind ? ' '+kind : '');
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(()=>{ t.remove(); }, 2000);
-  }
+    // ====== Utils ======
+    const $ = sel => document.querySelector(sel);
+    
+    // 🚨 Ajuste 1: Leer CSRF desde la cookie (Estándar de Django) 🚨
+    const csrfToken = (() => {
+        const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : "";
+    })();
 
-  async function fetchJSON(url, opts){
-    const isUnsafe = opts && /^(POST|PUT|PATCH|DELETE)$/i.test(opts.method||'');
-    const headers = Object.assign(
-      {"Content-Type":"application/json"},
-      isUnsafe ? {"X-CSRFToken": csrfToken} : {}
-    );
-    const r = await fetch(url, Object.assign({headers}, opts||{}));
-    if(!r.ok){
-      if(r.status === 204) return null;
-      let err = '';
-      try{ err = await r.text(); }catch(e){}
-      throw new Error(err || (r.status+' '+r.statusText));
+    function toast(msg, kind){
+        const t = document.createElement('div');
+        t.className = 'toast' + (kind ? ' '+kind : '');
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(()=>{ t.remove(); }, 2000);
     }
-    const ct = r.headers.get('content-type') || '';
-    return ct.includes('application/json') ? r.json() : r.text();
-  }
 
-  // ====== Cargar roles (API -> fallback) ======
-  async function loadRoles(){
-    let roles = [];
-    try {
-      const data = await fetchJSON(API.roles);
-      roles = (Array.isArray(data) && data.length) ? data : DEFAULT_ROLES;
-    } catch (e) {
-      roles = DEFAULT_ROLES;
+    async function fetchJSON(url, opts){
+        const isUnsafe = opts && /^(POST|PUT|PATCH|DELETE)$/i.test(opts.method||'');
+        const headers = Object.assign(
+            {"Content-Type":"application/json"},
+            isUnsafe ? {"X-CSRFToken": csrfToken} : {}
+        );
+        const fetcher = window.authFetch || fetch; 
+        
+        const r = await fetcher(url, Object.assign({headers}, opts||{}));
+        if(!r.ok){
+            if(r.status === 204) return null;
+            let err = '';
+            try{ err = await r.text(); }catch(e){}
+            throw new Error(err || (r.status+' '+r.statusText));
+        }
+        const ct = r.headers.get('content-type') || '';
+        return ct.includes('application/json') ? r.json() : r.text();
     }
-    window.__rolesCache = roles;
 
-    const sel = $("#role");
-    sel.innerHTML = '<option value="">Seleccionar rol</option>' +
-      roles.map(r=>`<option value="${r.id}">${r.name}</option>`).join("");
-  }
+    // ====== Cargar roles (API -> fallback) ======
+    async function loadRoles(){
+        let roles = [];
+        try {
+            const data = await fetchJSON(API.roles);
+            roles = (Array.isArray(data) && data.length) ? data : DEFAULT_ROLES;
+        } catch (e) {
+            console.warn("Error cargando roles de API, usando fallback.", e);
+            roles = DEFAULT_ROLES;
+        }
+        window.__rolesCache = roles.map((r, i) => ({ id: r.id || i + 1, name: r.name || r.id }));
 
-  // ====== Render tabla usuarios ======
-  function renderUsers(rows){
-    const tb = $("#tbody");
-    if(!rows || !rows.length){
-      tb.innerHTML = `<tr><td colspan="5" class="muted">Sin usuarios. Agrega el primero arriba.</td></tr>`;
-      return;
+        const sel = $("#role");
+        sel.innerHTML = '<option value="">Seleccionar rol</option>' +
+            window.__rolesCache.map(r=>`<option value="${r.id}">${r.name}</option>`).join("");
     }
-    tb.innerHTML = rows.map(u => `
-      <tr data-id="${u.id}">
-        <td>${u.email}</td>
-        <td>
-          <select class="select select-inline" data-edit-role="${u.id}">
-            ${window.__rolesCache.map(r => `
-              <option value="${r.id}" ${Number(u.role)===Number(r.id)?'selected':''}>${r.name}</option>
-            `).join('')}
-          </select>
-        </td>
-        <td>${new Date(u.created_at).toLocaleString("es-CL")}</td>
-        <td>${new Date(u.updated_at).toLocaleString("es-CL")}</td>
-        <td>
-          <button class="btn-ghost" data-del="${u.id}">Eliminar</button>
-        </td>
-      </tr>
-    `).join("");
-  }
 
-  // ====== Listar usuarios (GET) ======
-  async function loadUsers(){
-    try{
-      const users = await fetchJSON(API.users);
-      renderUsers(users);
-    }catch(e){
-      $("#tbody").innerHTML = `<tr><td colspan="5" class="muted">No se pudo conectar a la API de usuarios.</td></tr>`;
+    // ====== Render tabla usuarios ======
+    function renderUsers(rows){
+        const tb = $("#tbody");
+        if(!rows || !rows.length){
+            tb.innerHTML = `<tr><td colspan="5" class="muted">Sin usuarios. Agrega el primero arriba.</td></tr>`;
+            return;
+        }
+        tb.innerHTML = rows.map(u => {
+            const userRoleName = u.groups && u.groups.length ? u.groups[0].name : (u.role_name || 'Sin Rol');
+            const currentRole = window.__rolesCache.find(r => r.name === userRoleName) || {id: null};
+
+            return `
+                <tr data-id="${u.id}">
+                    <td>${u.email}</td>
+                    <td>
+                        <select class="select select-inline" data-edit-role="${u.id}">
+                            ${window.__rolesCache.map(r => `
+                                <option value="${r.id}" ${Number(currentRole.id)===Number(r.id)?'selected':''}>${r.name}</option>
+                            `).join('')}
+                        </select>
+                    </td>
+                    <td>${fmt(u.date_joined)}</td> 
+                    <td>${fmt(u.last_login)}</td> 
+                    <td>
+                        <button class="btn-ghost" data-del="${u.id}">Eliminar</button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
     }
-  }
 
-  // ====== Crear usuario (POST) ======
-  async function addUser(){
-    const email = $("#email").value.trim();
-    const roleId = $("#role").value;
-    if(!email || !/\S+@\S+\.\S+/.test(email)) return toast("Correo inválido", "warn");
-    if(!roleId) return toast("Selecciona un rol", "warn");
+    // ====== Listar usuarios (GET) ======
+    async function loadUsers(){
+        try{
+            const users = await fetchJSON(API.users);
+            renderUsers(users);
+        }catch(e){
+            $("#tbody").innerHTML = `<tr><td colspan="5" class="muted">No se pudo conectar a la API de usuarios.</td></tr>`;
+        }
+    }
 
-    await fetchJSON(API.users, {method:"POST", body: JSON.stringify({email, role: Number(roleId)})});
-    $("#email").value = ""; $("#role").value = "";
-    toast("Usuario agregado", "ok");
-    await loadUsers();
-  }
+    // ====== Crear usuario / Asignar Rol (POST) ======
+    async function addUser(){
+        const email = $("#email").value.trim();
+        const roleId = $("#role").value;
+        if(!email || !/\S+@\S+\.\S+/.test(email)) return toast("Correo inválido", "warn");
+        if(!roleId) return toast("Selecciona un rol", "warn");
+        
+        const roleName = window.__rolesCache.find(r => r.id == roleId)?.name;
+        
+        await fetchJSON(API.assign, { 
+            method:"POST", 
+            body: JSON.stringify({email: email, role: roleName})
+        }); 
+        
+        $("#email").value = ""; $("#role").value = "";
+        toast("Rol asignado (o usuario creado) correctamente", "ok");
+        await loadUsers();
+    }
 
-  // ====== Cambiar rol (PATCH) ======
-  async function changeRole(userId, roleId){
-    await fetchJSON(`${API.users}${userId}/`, {method:"PATCH", body: JSON.stringify({role: Number(roleId)})});
-    toast("Rol actualizado", "ok");
-    await loadUsers();
-  }
+    // ====== Cambiar rol (POST / PATCH) ======
+    async function changeRole(userId, roleId){
+        const roleName = window.__rolesCache.find(r => r.id == roleId)?.name;
+        if (!roleName) return toast("Rol no encontrado", "err");
+        
+        // 🚨 Ajuste 2: Simplificación - fetchJSON ya lanza error si falla 🚨
+        await fetchJSON(API.assign, {
+            method:"POST", 
+            body: JSON.stringify({user_id: userId, role: roleName})
+        });
+        
+        toast("Rol actualizado", "ok");
+        await loadUsers();
+    }
 
-  // ====== Eliminar (DELETE) ======
-  async function deleteUser(userId){
-    await fetchJSON(`${API.users}${userId}/`, {method:"DELETE"});
-    toast("Usuario eliminado", "ok");
-    await loadUsers();
-  }
+    // ====== Eliminar (DELETE) ======
+    async function deleteUser(userId){
+        const deleteUrl = API.users.replace(/\/$/, '') + '/' + userId + '/'; 
+        
+        await fetchJSON(deleteUrl, {method:"DELETE"});
+        toast("Usuario eliminado", "ok");
+        await loadUsers();
+    }
 
-  // ====== Exportar CSV (cliente) ======
-  async function exportCSV(){
-    const data = await fetchJSON(API.users).catch(()=>[]);
-    if(!data.length){ return toast("No hay usuarios", "warn"); }
-    const rows = [["email","rol","creado","actualizado"]];
-    data.forEach(u=>{
-      const rol = (window.__rolesCache.find(r=>Number(r.id)===Number(u.role))||{}).name || (u.role_name||"");
-      rows.push([u.email, rol, u.created_at, u.updated_at]);
+    // ====== Exportar CSV (cliente) ======
+    async function exportCSV(){
+        const data = await fetchJSON(API.users).catch(()=>[]);
+        if(!data.length){ return toast("No hay usuarios", "warn"); }
+        const rows = [["email","rol","creado","actualizado"]];
+        data.forEach(u=>{
+            const rol = u.groups && u.groups.length ? u.groups[0].name : (u.role_name||"");
+            rows.push([u.email, rol, u.date_joined, u.last_login]);
+        });
+        const csv = rows.map(r=>r.map(v=>{
+            const s=String(v??""); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+        }).join(",")).join("\n");
+        const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "usuarios.csv";
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    // ====== Eventos ======
+    document.addEventListener("click", (e)=>{
+        const b = e.target.closest("button");
+        if(!b) return;
+        if(b.id==="btn_add"){ e.preventDefault(); addUser().catch(err=>toast("Error al asignar: "+err.message,"err")); }
+        if(b.id==="btn_export"){ e.preventDefault(); exportCSV().catch(err=>toast("Error al exportar: "+err.message,"err")); }
+        if(b.dataset.del){ e.preventDefault(); if(confirm("¿Eliminar usuario?")) deleteUser(b.dataset.del).catch(err=>toast("Error al eliminar: "+err.message,"err")); }
     });
-    const csv = rows.map(r=>r.map(v=>{
-      const s=String(v??""); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
-    }).join(",")).join("\n");
-    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "usuarios.csv";
-    document.body.appendChild(a); a.click(); a.remove();
-  }
 
-  // ====== Eventos ======
-  document.addEventListener("click", (e)=>{
-    const b = e.target.closest("button");
-    if(!b) return;
-    if(b.id==="btn_add"){ e.preventDefault(); addUser().catch(err=>toast("Error al crear: "+err.message,"err")); }
-    if(b.id==="btn_export"){ e.preventDefault(); exportCSV().catch(err=>toast("Error al exportar: "+err.message,"err")); }
-    if(b.dataset.del){ e.preventDefault(); if(confirm("¿Eliminar usuario?")) deleteUser(b.dataset.del).catch(err=>toast("Error al eliminar: "+err.message,"err")); }
-  });
+    document.addEventListener("change", (e)=>{
+        const sel = e.target.closest('select[data-edit-role]');
+        if(!sel) return;
+        const id = sel.getAttribute('data-edit-role');
+        const roleId = sel.value;
+        changeRole(id, roleId).catch(err=>toast("Error al actualizar rol: "+err.message,"err"));
+    });
 
-  document.addEventListener("change", (e)=>{
-    const sel = e.target.closest('select[data-edit-role]');
-    if(!sel) return;
-    const id = sel.getAttribute('data-edit-role');
-    const roleId = sel.value;
-    changeRole(id, roleId).catch(err=>toast("Error al actualizar rol: "+err.message,"err"));
-  });
-
-  // ====== Init ======
-  (async function init(){
-    await loadRoles();
-    await loadUsers();
-  })();
+    // ====== Init ======
+    (async function init(){
+        await loadRoles();
+        await loadUsers();
+    })();
 })();
 </script>
 {% endblock %}

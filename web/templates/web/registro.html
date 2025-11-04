@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+  {% load static %}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <title>Crear cuenta • NUAMX</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{ --nuamx:#0A6A3B; --nuamx-dark:#064F2C; --ink:#1F2937; --muted:#6B7280; --bg:#F8FAFC; --card:#FFFFFF; --border:#E5E7EB; }
+    .btn{background:var(--nuamx);color:#fff;padding:.6rem 1rem;border-radius:.6rem;font-weight:600}
+    .btn:hover{background:var(--nuamx-dark)}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:1rem}
+    a{color:var(--nuamx-dark); font-weight:600}
+    .help{font-size:.8rem;color:var(--muted)}
+  </style>
+</head>
+<body class="min-h-screen bg-[color:var(--bg)] text-[color:var(--ink)] flex items-center justify-center p-4">
+
+  <div class="w-full max-w-md card p-6 shadow">
+    <div class="mb-6 text-center">
+      <div class="text-2xl font-semibold">Crear cuenta</div>
+      <div class="text-sm text-[color:var(--muted)]">Regístrate para usar NUAMX</div>
+    </div>
+
+    <form class="space-y-3" onsubmit="event.preventDefault(); register();">
+      <label class="block text-sm">Usuario</label>
+      <input id="reg-username" class="w-full border rounded-lg p-2.5" placeholder="usuario" autofocus name="username">
+
+      <label class="block text-sm">Email</label>
+      <input id="reg-email" type="email" class="w-full border rounded-lg p-2.5" placeholder="correo@nuamx.com" name="email">
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm">Nombre</label>
+          <input id="reg-firstname" class="w-full border rounded-lg p-2.5" placeholder="Nombre" name="first_name">
+        </div>
+        <div>
+          <label class="block text-sm">Apellido</label>
+          <input id="reg-lastname" class="w-full border rounded-lg p-2.5" placeholder="Apellido" name="last_name">
+        </div>
+      </div>
+
+      <label class="block text-sm">Contraseña</label>
+      <input id="reg-password" type="password" class="w-full border rounded-lg p-2.5" placeholder="********" name="password">
+      <div class="help">Mínimo 8 caracteres (se aplican validadores de Django).</div>
+
+      <label class="block text-sm">Repite contraseña</label>
+      <input id="reg-password2" type="password" class="w-full border rounded-lg p-2.5" placeholder="********" name="password2">
+    
+      <button id="reg-btn" class="btn w-full mt-5" type="submit">Crear cuenta</button>
+      <p id="reg-error" class="text-red-600 text-sm mt-3 hidden"></p>
+    </form>
+    
+    <p class="text-center text-sm mt-6">¿Ya tienes cuenta? <a href="{% url 'login' %}">Inicia sesión</a></p>
+  </div>
+
+  <script>
+    async function register() {
+      const u  = document.getElementById('reg-username').value.trim();
+      const e  = document.getElementById('reg-email').value.trim();
+      const fn = document.getElementById('reg-firstname').value.trim();
+      const ln = document.getElementById('reg-lastname').value.trim();
+      const p1 = document.getElementById('reg-password').value;
+      const p2 = document.getElementById('reg-password2').value;
+      const err = document.getElementById('reg-error');
+      const btn = document.getElementById('reg-btn');
+
+      err.classList.add('hidden'); err.textContent = '';
+
+      if (!u || !e || !p1 || !p2) { err.textContent = 'Completa los campos obligatorios.'; err.classList.remove('hidden'); return; }
+      if (p1 !== p2) { err.textContent = 'Las contraseñas no coinciden.'; err.classList.remove('hidden'); return; }
+
+      btn.disabled = true; btn.style.opacity = '0.7';
+
+      try {
+        // 1) Registrar
+        let res = await fetch('/api/auth/register/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: u, email: e, first_name: fn, last_name: ln, password: p1, password2: p2 })
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(()=>({}));
+          let msg = 'No se pudo registrar.';
+          if (data && typeof data === 'object') {
+            try { msg = Object.values(data).flat().join(' · ') || msg; } catch(_) {}
+          }
+          err.textContent = msg; err.classList.remove('hidden'); return;
+        }
+
+        // 2) Login automático
+        res = await fetch('/api/token/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: u, password: p1 })
+        });
+        if (!res.ok) {
+          err.textContent = 'Cuenta creada, pero no se pudo iniciar sesión automáticamente.';
+          err.classList.remove('hidden'); return;
+        }
+        const tokens = await res.json();
+
+        // 3) Guardar tokens + cookie para middleware
+        localStorage.setItem('access', tokens.access);
+        localStorage.setItem('refresh', tokens.refresh);
+        document.cookie = `access=${tokens.access}; Path=/; SameSite=Lax`;
+
+        // 4) Traer perfil
+        const meRes = await fetch('/api/me/', { headers: { 'Authorization': 'Bearer ' + tokens.access } });
+        if (!meRes.ok) { err.textContent = 'No se pudo cargar el perfil tras el registro.'; err.classList.remove('hidden'); return; }
+        const me = await meRes.json();
+        localStorage.setItem('me', JSON.stringify(me));
+
+        // 5) Ir al dashboard
+        location.href = '/dashboard/'; // ✅ CORRECCIÓN APLICADA AQUÍ
+      } catch (e) {
+        console.error(e);
+        err.textContent = 'Error de red.';
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.style.opacity = '1';
+      }
+    }
+
+    // El evento 'click' y 'keypress' ahora se manejan con el evento 'submit' del formulario.
+    // document.getElementById('reg-btn').addEventListener('click', register);
+    // document.addEventListener('keypress', e => { if (e.key === 'Enter') register(); });
+  </script>
+</body>
+</html>

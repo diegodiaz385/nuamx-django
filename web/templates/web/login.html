@@ -1,20 +1,132 @@
-{% extends "web/_base.html" %}
+<!doctype html>
+<html lang="es">
+<head>
+  {% load static %}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <title>Iniciar sesión • NUAMX</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{ --nuamx:#0A6A3B; --nuamx-dark:#064F2C; --ink:#1F2937; --muted:#6B7280; --bg:#F8FAFC; --card:#FFFFFF; --border:#E5E7EB; }
+    .btn{background:var(--nuamx);color:#fff;padding:.6rem 1rem;border-radius:.6rem;font-weight:600}
+    .btn:hover{background:var(--nuamx-dark)}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:1rem}
+    a{color:var(--nuamx-dark); font-weight:600}
+  </style>
+</head>
+<body class="min-h-screen bg-[color:var(--bg)] text-[color:var(--ink)] flex items-center justify-center p-4">
 
-{% block content %}
-<section class="max-w-md mx-auto card p-6 space-y-4">
-  <h2 class="text-xl font-semibold">Iniciar sesión</h2>
-  <p class="text-[color:var(--muted)]">Accede con tus credenciales NUAMX.</p>
+  <div class="w-full max-w-md card p-6 shadow">
+    <div class="mb-6 text-center">
+      <div class="text-2xl font-semibold">Iniciar sesión</div>
+      <div class="text-sm text-[color:var(--muted)]">Accede a tu cuenta NUAMX</div>
+    </div>
 
-  <input id="email" type="email" placeholder="Correo"
-         class="border border-gray-300 rounded p-2 w-full">
-  <input id="password" type="password" placeholder="Contraseña"
-         class="border border-gray-300 rounded p-2 w-full">
+    <div class="space-y-3">
+      <label class="block text-sm mb-1">Usuario o Email</label>
+      <input id="login-username" class="w-full border rounded-lg p-2.5 mb-4" placeholder="usuario o correo">
 
-  <button data-api="login"
-          class="btn w-full">🔐 Ingresar</button>
+      <label class="block text-sm mb-1">Contraseña</label>
+      <input id="login-password" type="password" class="w-full border rounded-lg p-2.5 mb-5" placeholder="********">
 
-  <p class="text-xs text-[color:var(--muted)]">
-    * Por ahora valida con mock. Luego conectamos a Oracle (SimpleJWT o endpoint propio).
-  </p>
-</section>
-{% endblock %}
+      <button id="login-btn" class="btn w-full">Iniciar sesión</button>
+      <p id="login-error" class="text-red-600 text-sm mt-3 hidden"></p>
+
+      <p class="text-center text-sm mt-4">
+        ¿No tienes cuenta?
+        <a href="{% url 'register' %}" class="font-semibold text-[color:var(--nuamx-dark)] hover:underline">
+          Crear cuenta
+        </a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    async function login() {
+      const uInput = document.getElementById('login-username');
+      const pInput = document.getElementById('login-password');
+      const btn = document.getElementById('login-btn');
+      const errorEl = document.getElementById('login-error');
+
+      const u = (uInput?.value || '').trim();
+      const p = pInput?.value || '';
+
+      // limpiar error previo
+      errorEl?.classList.add('hidden');
+      if (errorEl) errorEl.textContent = '';
+
+      if (!u || !p) {
+        if (errorEl) {
+          errorEl.textContent = 'Debes ingresar usuario y contraseña';
+          errorEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      // deshabilita botón mientras envía
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
+
+      try {
+        // Solicita tokens JWT
+        const res = await fetch('/api/token/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: u, password: p })
+        });
+
+        if (!res.ok) {
+          let msg = 'Credenciales inválidas';
+          try {
+            const j = await res.json();
+            if (j?.detail) msg = j.detail;
+          } catch (_) {}
+          if (errorEl) { errorEl.textContent = msg; errorEl.classList.remove('hidden'); }
+          return;
+        }
+
+        const data = await res.json();
+
+        // Guarda tokens (front)
+        localStorage.setItem('access', data.access);
+        localStorage.setItem('refresh', data.refresh);
+
+        // Guarda access en cookie (para middleware server-side)
+        document.cookie = `access=${data.access}; Path=/; SameSite=Lax`;
+
+        // Perfil del usuario
+        const meRes = await fetch('/api/me/', {
+          headers: { 'Authorization': 'Bearer ' + data.access }
+        });
+
+        if (!meRes.ok) {
+          if (errorEl) {
+            errorEl.textContent = 'No se pudo obtener el perfil del usuario.';
+            errorEl.classList.remove('hidden');
+          }
+          return;
+        }
+
+        const me = await meRes.json();
+        localStorage.setItem('me', JSON.stringify(me));
+
+        // Redirección post login
+        location.href = '/dashboard/'; // 🚨 CORRECCIÓN APLICADA AQUÍ: Usa ruta absoluta
+      } catch (err) {
+        console.error(err);
+        if (errorEl) {
+          errorEl.textContent = 'Error al conectar con el servidor.';
+          errorEl.classList.remove('hidden');
+        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      }
+    }
+
+    // Click + Enter en ambos inputs
+    document.getElementById('login-btn')?.addEventListener('click', login);
+    document.getElementById('login-username')?.addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
+    document.getElementById('login-password')?.addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
+  </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 # web/views.py
+
 from django.shortcuts import render
 
 def login_view(request):
@@ -27,3 +28,8 @@ def no_inscritos_view(request):
 
 def admin_roles_view(request):
     return render(request, "web/admin-roles.html")
+
+# 🚨 VISTA DE REGISTRO AGREGADA 🚨
+def register_view(request):
+    """Muestra el formulario de registro (registro.html)."""
+    return render(request, "web/registro.html")

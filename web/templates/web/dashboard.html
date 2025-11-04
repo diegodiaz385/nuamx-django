@@ -51,16 +51,14 @@
 {% endblock %}
 
 {% block content %}
-<!-- Barra superior de acciones -->
 <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
   <div class="muted">Inicio / Dashboard</div>
   <div class="toolbar">
     <button class="btn-ghost" data-api="report:mensual" type="button">Descargar CSV</button>
-    <a href="carga-masiva.html" class="btn">Nueva carga</a>
+    <a href="{% url 'carga-masiva' %}" class="btn">Nueva carga</a>
   </div>
 </div>
 
-<!-- KPIs -->
 <section class="grid grid-3">
   <div class="card kpi">
     <div class="label">Registros totales</div>
@@ -79,7 +77,6 @@
   </div>
 </section>
 
-<!-- Últimas cargas -->
 <section class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
     <h3 class="section-title">Últimas cargas</h3>
@@ -131,11 +128,10 @@
   </div>
 </section>
 
-<!-- Accesos rápidos (nuevo look) -->
 <section class="card">
   <div class="section-title">Accesos rápidos</div>
   <div class="quick-grid" role="list">
-    <a class="quick-card" href="carga-masiva.html" role="listitem" aria-label="Cargar archivo">
+    <a class="quick-card" href="{% url 'carga-masiva' %}" role="listitem" aria-label="Cargar archivo">
       <div class="quick-icon">📤</div>
       <div class="quick-body">
         <div class="quick-title">Cargar archivo</div>
@@ -144,7 +140,7 @@
       <div class="quick-arrow">➜</div>
     </a>
 
-    <a class="quick-card" href="busqueda.html" role="listitem" aria-label="Buscar registros">
+    <a class="quick-card" href="{% url 'busqueda' %}" role="listitem" aria-label="Buscar registros">
       <div class="quick-icon">🔎</div>
       <div class="quick-body">
         <div class="quick-title">Buscar registros</div>
@@ -153,7 +149,7 @@
       <div class="quick-arrow">➜</div>
     </a>
 
-    <a class="quick-card" href="reportes.html" role="listitem" aria-label="Reportes">
+    <a class="quick-card" href="{% url 'reportes' %}" role="listitem" aria-label="Reportes">
       <div class="quick-icon">📈</div>
       <div class="quick-body">
         <div class="quick-title">Reportes</div>
