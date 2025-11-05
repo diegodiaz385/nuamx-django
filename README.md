@@ -36,6 +36,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 5. Aplicar migraciones (crea la base de datos)
+pip install djangorestframework-simplejwt
 python manage.py migrate
 
 # 6. Crear un usuario administrador (requerido para acceder al panel de roles)
