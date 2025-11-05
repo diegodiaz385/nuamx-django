@@ -26,8 +26,7 @@ sudo apt update
 sudo apt install python3 python3-pip python3-venv git -y
 
 # 2. Clonar el repositorio
-git clone [https://github.com/diegodiaz385/nuamx-django](https://github.com/diegodiaz385/nuamx-django)
-cd nuamx-django
+git clone https://github.com/diegodiaz385/nuamx-django
 
 # 3. Crear y activar el entorno virtual
 python3 -m venv .venv
