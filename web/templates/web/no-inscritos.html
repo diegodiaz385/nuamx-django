@@ -1,36 +1,320 @@
 {% extends "web/_base.html" %}
 
 {% block content %}
-<section class="card p-6 space-y-4">
-  <h2 class="text-xl font-semibold">Instrumentos no inscritos</h2>
-  <p class="text-sm text-gray-500 mt-1">Administra documentos tributarios sin inscripción y su estado.</p>
+<section class="space-y-6">
 
-  <div class="flex gap-2">
-    <button class="btn" data-api="roles">🔄 Actualizar lista (demo)</button>
-    <button class="btn-ghost">Exportar CSV</button>
+  <!-- Encabezado -->
+  <header class="flex items-start justify-between gap-3">
+    <div>
+      <h2 class="text-2xl font-semibold tracking-tight m-0 flex items-center gap-2">
+        <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-100 text-emerald-700">🗂️</span>
+        Instrumentos no inscritos
+      </h2>
+      <p class="text-sm text-[color:var(--muted)] mt-1">
+        Visualiza y filtra documentos con RUT potencialmente no registrado (heurística: <em>Razón social</em> vacía) o según tus filtros.
+      </p>
+    </div>
+    <div class="hidden md:flex items-center gap-2">
+      <a id="btn_csv_top" class="btn-ghost" href="#" download>⬇️ Exportar CSV</a>
+    </div>
+  </header>
+
+  <!-- Filtros -->
+  <div class="card p-4 md:p-5">
+    <style>
+      /* ====== Filtros bonitos ====== */
+      .filter-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}
+      .ctl{position:relative}
+      .ctl input,
+      .ctl select{
+        width:100%; padding:.70rem .9rem .70rem 2.35rem;
+        border:1px solid var(--border); background:#fff; border-radius:.75rem;
+        min-height:44px; font-size:.925rem; outline:none; transition:.15s ease;
+        box-shadow: 0 1px 0 rgba(0,0,0,.02);
+      }
+      .ctl select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-image:none}
+      .ctl:focus-within input,
+      .ctl:focus-within select{border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+      .ctl .ico{
+        position:absolute; left:.65rem; top:50%; transform:translateY(-50%);
+        width:1.1rem; height:1.1rem; opacity:.6;
+      }
+      .lbl{display:block; font-size:.78rem; color:var(--muted); margin:0 0 .35rem .15rem}
+      /* caret bonito para los selects */
+      .ctl.select::after{
+        content:""; position:absolute; right:.7rem; top:50%; transform:translateY(-50%);
+        width:.55rem; height:.55rem; border-right:2px solid #64748b; border-bottom:2px solid #64748b; rotate:45deg; opacity:.7;
+      }
+      /* chip + toggle */
+      .chip-card{
+        display:flex; align-items:center; gap:.75rem; padding:.65rem .75rem;
+        border:1px dashed var(--border); background:linear-gradient(180deg,#fff,#fafafa);
+        border-radius:.9rem; min-height:44px;
+      }
+      .switch{appearance:none;width:42px;height:24px;background:#e5e7eb;border-radius:999px;position:relative;outline:none;cursor:pointer;transition:.2s}
+      .switch:checked{background:#34d399}
+      .switch::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:999px;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+      .switch:checked::after{left:20px}
+      /* table candy */
+      .thead-sticky th{position:sticky;top:0;background:linear-gradient(#f9fafb,#f3f4f6);z-index:1}
+      .row-hover tbody tr:hover{background:#f8fafc}
+      .badge{padding:.25rem .5rem;border-radius:.5rem;font-size:.75rem;font-weight:500;display:inline-block}
+      .b-ok{background:#ecfdf5;color:#047857}.b-warn{background:#fffbeb;color:#92400e}.b-err{background:#fef2f2;color:#b91c1c}
+      .skeleton{position:relative;overflow:hidden;background:linear-gradient(90deg,#f1f5f9,#f8fafc 45%,#f1f5f9 80%);animation:sheen 1.25s linear infinite}
+      @keyframes sheen{0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0}}
+    </style>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <div class="inline-flex items-center gap-.5 rounded-full border border-[color:var(--border)] bg-white px-3 py-1.5 text-sm">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Filtros activos
+      </div>
+      <div class="flex gap-2">
+        <button type="button" id="btn_buscar"    class="btn">🔎 Buscar</button>
+        <button type="button" id="btn_limpiar"   class="btn-ghost">🧹 Limpiar</button>
+        <button type="button" id="btn_actualizar" class="btn-ghost">🔄 Actualizar</button>
+        <a id="btn_csv" class="btn-ghost" href="#" download>⬇️ Exportar CSV</a>
+      </div>
+    </div>
+
+    <!-- Inputs con iconitos -->
+    <form id="filtros" class="filter-grid">
+      <!-- RUT -->
+      <div class="md:col-span-3 col-span-12">
+        <label class="lbl">RUT</label>
+        <div class="ctl">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5Zm0 0c-4.42 0-8 3.58-8 8h16c0-4.42-3.58-8-8-8Z" stroke="currentColor" stroke-width="1.5"/></svg>
+          <input id="f_rut" type="text" class="" placeholder="11.111.111-1">
+        </div>
+      </div>
+
+      <!-- Razón social -->
+      <div class="md:col-span-3 col-span-12">
+        <label class="lbl">Razón social</label>
+        <div class="ctl">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="1.5"/></svg>
+          <input id="f_razon" type="text" placeholder="Ej: Ejemplo SpA">
+        </div>
+      </div>
+
+      <!-- Período desde -->
+      <div class="md:col-span-2 col-span-6">
+        <label class="lbl">Período desde</label>
+        <div class="ctl">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M7 3v3M17 3v3M4 9h16M6 21h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" stroke="currentColor" stroke-width="1.5"/></svg>
+          <input id="f_pdesde" type="month">
+        </div>
+      </div>
+
+      <!-- Período hasta -->
+      <div class="md:col-span-2 col-span-6">
+        <label class="lbl">Período hasta</label>
+        <div class="ctl">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M7 3v3M17 3v3M4 9h16M6 21h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" stroke="currentColor" stroke-width="1.5"/></svg>
+          <input id="f_phasta" type="month">
+        </div>
+      </div>
+
+      <!-- Tipo -->
+      <div class="md:col-span-2 col-span-6">
+        <label class="lbl">Tipo</label>
+        <div class="ctl select">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.5"/></svg>
+          <select id="f_tipo">
+            <option value="">— Todos —</option>
+            <option>Factura</option>
+            <option>Boleta</option>
+            <option>Nota de crédito</option>
+            <option>Otro</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Estado -->
+      <div class="md:col-span-2 col-span-6">
+        <label class="lbl">Estado</label>
+        <div class="ctl select">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 4v6c0 4.418-3.582 8-8 8S3 18.418 3 14V7l9-4Z" stroke="currentColor" stroke-width="1.5"/></svg>
+          <select id="f_estado">
+            <option value="">— Todos —</option>
+            <option>Válida</option>
+            <option>Con advertencias</option>
+            <option>Rechazada</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Moneda -->
+      <div class="md:col-span-2 col-span-6">
+        <label class="lbl">Moneda</label>
+        <div class="ctl select">
+          <svg class="ico" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="1.5"/></svg>
+          <select id="f_moneda">
+            <option value="">— Todas —</option>
+            <option>USD</option>
+            <option>COP</option>
+            <option>CLP</option>
+            <option>PEN</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Solo no inscritos -->
+      <div class="md:col-span-3 col-span-12 flex items-center chip-card">
+        <input id="f_noi" type="checkbox" class="switch">
+        <div class="leading-tight">
+          <div class="text-sm font-medium">Solo no inscritos</div>
+          <div class="text-xs text-[color:var(--muted)]">Filtra filas con <em>Razón social</em> vacía</div>
+        </div>
+      </div>
+    </form>
   </div>
 
-  <table class="w-full text-sm mt-4">
-    <thead class="bg-gray-50">
-      <tr>
-        <th class="text-left p-3">RUT</th>
-        <th class="text-left p-3">Razón social</th>
-        <th class="text-left p-3">Tipo</th>
-        <th class="text-left p-3">Folio</th>
-        <th class="text-left p-3">Monto</th>
-        <th class="text-left p-3">Estado</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr class="border-b last:border-0">
-        <td class="p-3">11.111.111-1</td>
-        <td class="p-3">Ejemplo SpA</td>
-        <td class="p-3">Factura</td>
-        <td class="p-3">123456</td>
-        <td class="p-3">$1.500.000</td>
-        <td class="p-3"><span class="px-2 py-1 bg-yellow-50 text-yellow-700 rounded">Pendiente</span></td>
-      </tr>
-    </tbody>
-  </table>
+  <!-- Tabla -->
+  <div class="card p-0 overflow-hidden">
+    <div class="overflow-auto">
+      <table class="w-full text-sm row-hover">
+        <thead class="thead-sticky">
+          <tr>
+            <th class="text-left p-3">RUT</th>
+            <th class="text-left p-3">Razón social</th>
+            <th class="text-left p-3">Período</th>
+            <th class="text-left p-3">Tipo</th>
+            <th class="text-left p-3">Folio</th>
+            <th class="text-left p-3">Moneda</th>
+            <th class="text-right p-3">Monto</th>
+            <th class="text-left p-3">Estado</th>
+            <th class="text-left p-3">Observaciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody" class="divide-y">
+          <tr><td class="p-3" colspan="9"><div class="h-8 rounded skeleton"></div></td></tr>
+          <tr><td class="p-3" colspan="9"><div class="h-8 rounded skeleton"></div></td></tr>
+          <tr><td class="p-3" colspan="9"><div class="h-8 rounded skeleton"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 px-4 py-3 border-t">
+      <div class="text-xs text-[color:var(--muted)]">
+        Mostrando <span id="count_items">0</span> registro(s).
+      </div>
+      <div class="flex items-center gap-2">
+        <a id="btn_csv_bottom" class="btn-ghost" href="#" download>⬇️ Exportar CSV</a>
+      </div>
+    </div>
+  </div>
 </section>
+
+<script>
+(function(){
+  const $ = sel => document.querySelector(sel);
+
+  const qs = (params) => {
+    const out = new URLSearchParams();
+    Object.entries(params).forEach(([k,v])=>{
+      if (v !== undefined && v !== null && String(v).trim() !== "") out.set(k, v);
+    });
+    return out.toString();
+  };
+
+  const readFilters = () => ({
+    rut:      $("#f_rut").value.trim(),
+    razon:    $("#f_razon").value.trim(),
+    pdesde:   $("#f_pdesde").value,
+    phasta:   $("#f_phasta").value,
+    tipo:     $("#f_tipo").value,
+    estado:   $("#f_estado").value,
+    moneda:   $("#f_moneda").value,
+    no_inscritos: $("#f_noi").checked ? "1" : ""
+  });
+
+  const fmtMoney = (num, moneda) => {
+    if (num === null || num === undefined || num === "") return "—";
+    const isDec = (String(moneda).toUpperCase()==="USD"||String(moneda).toUpperCase()==="PEN");
+    const n = Number(num);
+    return new Intl.NumberFormat('es-CL',{minimumFractionDigits:isDec?2:0,maximumFractionDigits:isDec?2:0}).format(n);
+  };
+
+  const badgeEstado = (estado) => {
+    if (estado === "Válida") return `<span class="badge b-ok">Válida</span>`;
+    if (estado === "Con advertencias") return `<span class="badge b-warn">Con advertencias</span>`;
+    if (estado === "Rechazada") return `<span class="badge b-err">Rechazada</span>`;
+    return `<span class="badge" style="background:#eef2f7;color:#4b5563">${estado||"—"}</span>`;
+  };
+
+  const showEmpty = (msg) => {
+    $("#tbody").innerHTML = `
+      <tr>
+        <td colspan="9" class="p-8 text-center">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 mb-2">🫙</div>
+          <div class="text-sm text-[color:var(--muted)]">${msg}</div>
+        </td>
+      </tr>`;
+    $("#count_items").textContent = "0";
+  };
+
+  const buildCsvHref = () => {
+    const params = readFilters();
+    const url = '/api/calificaciones/export_csv?' + qs(params);
+    $("#btn_csv").setAttribute("href", url);
+    $("#btn_csv_top").setAttribute("href", url);
+    $("#btn_csv_bottom").setAttribute("href", url);
+  };
+
+  const renderRows = (items) => {
+    const tbody = $("#tbody");
+    if (!items.length) { showEmpty("Sin resultados con los filtros actuales."); return; }
+    const rows = items.map(c=>{
+      const moneda = (c.moneda||"CLP").toUpperCase();
+      return `
+        <tr>
+          <td class="p-3">${c.rut||"—"}</td>
+          <td class="p-3">${c.razon_social?c.razon_social:"<span class='text-[color:var(--muted)] italic'>—</span>"}</td>
+          <td class="p-3 text-center">${c.periodo||"—"}</td>
+          <td class="p-3 text-center">${c.tipo_instrumento||"—"}</td>
+          <td class="p-3 text-center">${c.folio||"—"}</td>
+          <td class="p-3 text-center">${moneda}</td>
+          <td class="p-3 text-right tabular-nums">${fmtMoney(c.monto, moneda)}</td>
+          <td class="p-3">${badgeEstado(c.estado_validacion)}</td>
+          <td class="p-3">${(c.observaciones||"").trim()}</td>
+        </tr>`;
+    }).join("");
+    tbody.innerHTML = rows;
+    $("#count_items").textContent = String(items.length);
+  };
+
+  const showSkeleton = () => {
+    $("#tbody").innerHTML = `
+      <tr><td class="p-3" colspan="9"><div class="h-8 rounded skeleton"></div></td></tr>
+      <tr><td class="p-3" colspan="9"><div class="h-8 rounded skeleton"></div></td></tr>
+      <tr><td class="p-3" colspan="9"><div class="h-8 rounded skeleton"></div></td></tr>`;
+  };
+
+  const fetchData = async () => {
+    buildCsvHref();
+    const url = '/api/calificaciones/?' + qs(readFilters());
+    showSkeleton();
+    try{
+      const res = await fetch(url,{credentials:"same-origin"});
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const data = await res.json();
+      const items = Array.isArray(data)?data:(data.results||[]);
+      renderRows(items);
+    }catch(e){ console.error(e); showEmpty("Error cargando datos."); }
+  };
+
+  $("#btn_buscar").addEventListener("click", fetchData);
+  $("#btn_actualizar").addEventListener("click", fetchData);
+  $("#btn_limpiar").addEventListener("click", ()=>{
+    $("#f_rut").value=""; $("#f_razon").value=""; $("#f_pdesde").value=""; $("#f_phasta").value="";
+    $("#f_tipo").value=""; $("#f_estado").value=""; $("#f_moneda").value=""; $("#f_noi").checked=true;
+    fetchData();
+  });
+
+  // Estado inicial
+  $("#f_noi").checked = true;
+  fetchData();
+  buildCsvHref();
+})();
+</script>
 {% endblock %}

@@ -49,7 +49,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.utils import timezone  # ⬅️ para reportes (rango por fecha)
 
-# finder de archivos estáticos (para la plantilla XLSX exacta)
+# finder de archivos estáticos (para la plantilla XLSX exacta si se usara)
 try:
     from django.contrib.staticfiles import finders
 except Exception:
@@ -306,7 +306,7 @@ class CalificacionViewSet(viewsets.ModelViewSet):
     """
     CRUD de calificaciones (auth requerida).
     """
-    # ⬇️ NUEVO: acepta JWT y/o cookie de sesión
+    # ⬇️ Acepta JWT y/o cookie de sesión
     if JWTAuthentication:
         authentication_classes = (JWTAuthentication, SessionAuthentication)
     else:
@@ -329,6 +329,9 @@ class CalificacionViewSet(viewsets.ModelViewSet):
         tipo = (qp.get("tipo") or "").strip()
         estado = (qp.get("estado") or "").strip()
         moneda = (qp.get("moneda") or "").strip().upper()
+        # ⬇️ NUEVO: filtro de "no inscritos" (razón social vacía o NULL)
+        no_inscritos = (qp.get("no_inscritos") or qp.get("noi") or "").strip().lower()
+        want_noi = no_inscritos in ("1", "true", "on", "sí", "si")
 
         if rut:
             qs = qs.filter(rut__icontains=rut)
@@ -344,6 +347,8 @@ class CalificacionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(estado_validacion=estado)
         if moneda:
             qs = qs.filter(moneda=moneda)
+        if want_noi:
+            qs = qs.filter(Q(razon_social__isnull=True) | Q(razon_social=""))
 
         return qs
 
@@ -441,10 +446,43 @@ class CalificacionViewSet(viewsets.ModelViewSet):
         ws.auto_filter.ref = "A1:I1"
         ws.row_dimensions[1].height = 22
 
-        from openpyxl.worksheet.datavalidation import DataValidation
-        dv_tipo = DataValidation(type="list", formula1='"Factura,Boleta,Nota de crédito,Otro"', allow_blank=True)
-        dv_moneda = DataValidation(type="list", formula1='"CLP,USD,COP,PEN"', allow_blank=True)
-        dv_estado = DataValidation(type="list", formula1='"Válida,Con advertencias,Rechazada"', allow_blank=True)
+        # VALIDACIONES ESTRICTAS (solo opciones; sin permitir escribir otras)
+        dv_tipo = DataValidation(
+            type="list",
+            formula1='"Factura,Boleta,Nota de crédito,Otro"',
+            allow_blank=False,
+            showErrorMessage=True,
+            errorTitle="Valor inválido",
+            error="Debe seleccionar una opción de la lista: Factura, Boleta, Nota de crédito u Otro.",
+            errorStyle="stop",
+            showInputMessage=True,
+            promptTitle="Tipo",
+            prompt="Seleccione: Factura, Boleta, Nota de crédito u Otro."
+        )
+        dv_moneda = DataValidation(
+            type="list",
+            formula1='"USD,COP,CLP,PEN"',
+            allow_blank=False,
+            showErrorMessage=True,
+            errorTitle="Valor inválido",
+            error="Debe seleccionar una moneda de la lista: USD, COP, CLP o PEN.",
+            errorStyle="stop",
+            showInputMessage=True,
+            promptTitle="Moneda",
+            prompt="Seleccione: USD, COP, CLP o PEN."
+        )
+        dv_estado = DataValidation(
+            type="list",
+            formula1='"Válida,Con advertencias,Rechazada"',
+            allow_blank=False,
+            showErrorMessage=True,
+            errorTitle="Valor inválido",
+            error="Debe seleccionar una opción: Válida, Con advertencias o Rechazada.",
+            errorStyle="stop",
+            showInputMessage=True,
+            promptTitle="Estado",
+            prompt="Seleccione: Válida, Con advertencias o Rechazada."
+        )
         ws.add_data_validation(dv_tipo)
         ws.add_data_validation(dv_moneda)
         ws.add_data_validation(dv_estado)
@@ -494,6 +532,7 @@ class CalificacionViewSet(viewsets.ModelViewSet):
                 else:
                     cell.alignment = Alignment(vertical="top", wrap_text=True)
 
+            # Aplicar validaciones celda por celda
             dv_tipo.add(ws.cell(i, 4))
             dv_moneda.add(ws.cell(i, 7))
             dv_estado.add(ws.cell(i, 8))
@@ -503,15 +542,6 @@ class CalificacionViewSet(viewsets.ModelViewSet):
             if num is None:
                 c_monto.value = None
             c_monto.number_format = "#,##0.00" if mon in ("USD", "PEN") else "#,##0"
-
-            ws.cell(i, 1, rut)
-            ws.cell(i, 2, raz)
-            ws.cell(i, 3, per)
-            ws.cell(i, 4, tip)
-            ws.cell(i, 5, fol)
-            ws.cell(i, 7, mon)
-            ws.cell(i, 8, est)
-            ws.cell(i, 9, obs)
 
             ws.row_dimensions[i].height = 18
 
@@ -587,54 +617,140 @@ class CalificacionViewSet(viewsets.ModelViewSet):
 
 # ========================= Carga masiva: plantilla/preview/commit =========================
 class CalificacionTemplateView(APIView):
+    """
+    Genera y entrega un XLSX con EXACTAMENTE las mismas opciones de Carga Masiva:
+    - Columnas: RUT, Razón social, Período, Tipo, Folio, Monto, Moneda, Estado, Observaciones
+    - Listas (solo selección, sin escritura libre):
+        * Tipo:    Factura, Boleta, Nota de crédito, Otro
+        * Moneda:  USD, COP, CLP, PEN
+        * Estado:  Válida, Con advertencias, Rechazada
+    - 10 filas vacías, cabecera verde suave, zebra, autofiltro y panes congelados.
+    """
     permission_classes = [permissions.IsAuthenticated]
-    STATIC_REL_PATH = "plantillas/plantilla_carga_masiva_10filas_moneda.xlsx"
-
-    def _candidate_paths(self):
-        tried = []
-        env_path = os.environ.get("NUAMX_TEMPLATE_PATH")
-        if env_path:
-            tried.append(env_path)
-        if finders:
-            found = finders.find(self.STATIC_REL_PATH)
-            if found:
-                tried.append(found)
-        base_dir = getattr(settings, "BASE_DIR", None)
-        if base_dir:
-            tried.append(os.path.join(str(base_dir), "web", "static", self.STATIC_REL_PATH))
-            tried.append(os.path.join(str(base_dir), "static", self.STATIC_REL_PATH))
-        here = os.path.dirname(os.path.dirname(__file__))  # .../api
-        tried.append(os.path.abspath(os.path.join(here, "..", "web", "static", self.STATIC_REL_PATH)))
-        tried.append(os.path.abspath(os.path.join(here, "static", self.STATIC_REL_PATH)))
-        return tried
 
     def get(self, request):
-        candidates = self._candidate_paths()
-        print("[NUAMX] CalificacionTemplateView - buscando XLSX en:")
-        for p in candidates:
-            print(f"  -> {p}")
-
-        abs_path = next((p for p in candidates if p and os.path.exists(p)), None)
-
-        if not abs_path:
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.worksheet.datavalidation import DataValidation
+            from openpyxl.worksheet.table import Table, TableStyleInfo
+        except Exception:
             return Response(
-                {
-                    "detail": (
-                        "No se encontró la plantilla XLSX. "
-                        "Colócala en alguno de estos paths y recarga:\n"
-                        + "\n".join(candidates)
-                        + "\nO define NUAMX_TEMPLATE_PATH con la ruta absoluta al archivo."
-                    )
-                },
-                status=status.HTTP_404_NOT_FOUND,
+                {"detail": "Servidor sin 'openpyxl'. Instálalo: pip install openpyxl"},
+                status=500,
             )
 
-        return FileResponse(
-            open(abs_path, "rb"),
-            as_attachment=True,
-            filename="plantilla_carga_masiva.xlsx",
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Carga masiva"
+
+        headers = ["RUT","Razón social","Período","Tipo","Folio","Monto","Moneda","Estado","Observaciones"]
+        ws.append(headers)
+
+        HEX_HEADER = "E8F5E9"
+        HEX_ZEBRA  = "F3FBF4"
+        HEX_BORDER = "DDE5DD"
+        HEX_TEXT   = "0F172A"
+
+        thin = Side(style="thin", color=HEX_BORDER)
+        border = Border(top=thin, left=thin, right=thin, bottom=thin)
+
+        for col, title in enumerate(headers, start=1):
+            c = ws.cell(row=1, column=col, value=title)
+            c.fill = PatternFill("solid", fgColor=HEX_HEADER)
+            c.font = Font(bold=True, color=HEX_TEXT)
+            c.alignment = Alignment(vertical="center", horizontal="center")
+            c.border = border
+
+        widths = [14, 26, 12, 18, 12, 16, 12, 22, 40]
+        for i, wdt in enumerate(widths, start=1):
+            ws.column_dimensions[chr(64+i)].width = wdt
+
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = "A1:I1"
+        ws.row_dimensions[1].height = 22
+
+        # VALIDACIONES ESTRICTAS (solo opciones; sin escritura libre)
+        dv_tipo = DataValidation(
+            type="list",
+            formula1='"Factura,Boleta,Nota de crédito,Otro"',
+            allow_blank=False,
+            showErrorMessage=True,
+            errorTitle="Valor inválido",
+            error="Debe seleccionar una opción de la lista: Factura, Boleta, Nota de crédito u Otro.",
+            errorStyle="stop",
+            showInputMessage=True,
+            promptTitle="Tipo",
+            prompt="Seleccione: Factura, Boleta, Nota de crédito u Otro."
+        )
+        dv_moneda = DataValidation(
+            type="list",
+            formula1='"USD,COP,CLP,PEN"',
+            allow_blank=False,
+            showErrorMessage=True,
+            errorTitle="Valor inválido",
+            error="Debe seleccionar una moneda de la lista: USD, COP, CLP o PEN.",
+            errorStyle="stop",
+            showInputMessage=True,
+            promptTitle="Moneda",
+            prompt="Seleccione: USD, COP, CLP o PEN."
+        )
+        dv_estado = DataValidation(
+            type="list",
+            formula1='"Válida,Con advertencias,Rechazada"',
+            allow_blank=False,
+            showErrorMessage=True,
+            errorTitle="Valor inválido",
+            error="Debe seleccionar una opción: Válida, Con advertencias o Rechazada.",
+            errorStyle="stop",
+            showInputMessage=True,
+            promptTitle="Estado",
+            prompt="Seleccione: Válida, Con advertencias o Rechazada."
+        )
+        ws.add_data_validation(dv_tipo)
+        ws.add_data_validation(dv_moneda)
+        ws.add_data_validation(dv_estado)
+
+        # 10 filas vacías con validaciones
+        for i in range(2, 12):
+            ws.append(["", "", "", "", "", None, "", "", ""])
+            if i % 2 == 0:
+                for col in range(1, 10):
+                    ws.cell(i, col).fill = PatternFill("solid", fgColor=HEX_ZEBRA)
+            for col in range(1, 10):
+                cell = ws.cell(i, col)
+                cell.border = border
+                cell.font = Font(color=HEX_TEXT)
+                if col in (1, 3, 4, 5, 7, 8):
+                    cell.alignment = Alignment(vertical="center", horizontal="center")
+                elif col == 6:
+                    cell.alignment = Alignment(vertical="center", horizontal="right")
+                else:
+                    cell.alignment = Alignment(vertical="top", wrap_text=True)
+            dv_tipo.add(f"D{i}")
+            dv_moneda.add(f"G{i}")
+            dv_estado.add(f"H{i}")
+            ws.cell(i, 6).number_format = "#,##0"  # entero por defecto
+
+        # Tabla
+        last_row = ws.max_row
+        table = Table(displayName="Calificaciones", ref=f"A1:I{last_row}")
+        table_style = TableStyleInfo(
+            name="TableStyleMedium9",
+            showFirstColumn=False, showLastColumn=False,
+            showRowStripes=True, showColumnStripes=False,
+        )
+        table.tableStyleInfo = table_style
+        ws.add_table(table)
+
+        bio = io.BytesIO()
+        wb.save(bio); bio.seek(0)
+        resp = HttpResponse(
+            bio.getvalue(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+        resp["Content-Disposition"] = 'attachment; filename="plantilla_carga_masiva.xlsx"'
+        return resp
 
 class CalificacionBulkPreviewView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -895,6 +1011,9 @@ class ReporteExportView(APIView):
         tipo    = (qp.get("tipo") or "").strip()
         estado  = (qp.get("estado") or "").strip()
         moneda  = (qp.get("moneda") or "").strip().upper()
+        # ⬇️ NUEVO: soporte para no_inscritos también en reportes
+        no_inscritos = (qp.get("no_inscritos") or qp.get("noi") or "").strip().lower()
+        want_noi = no_inscritos in ("1", "true", "on", "sí", "si")
 
         if rut: qs = qs.filter(rut__icontains=rut)
         if razon: qs = qs.filter(razon_social__icontains=razon)
@@ -903,6 +1022,7 @@ class ReporteExportView(APIView):
         if tipo: qs = qs.filter(tipo_instrumento=tipo)
         if estado: qs = qs.filter(estado_validacion=estado)
         if moneda: qs = qs.filter(moneda=moneda)
+        if want_noi: qs = qs.filter(Q(razon_social__isnull=True) | Q(razon_social=""))
         return qs
 
     def get(self, request):
