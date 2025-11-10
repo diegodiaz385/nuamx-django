@@ -5,88 +5,50 @@
 
 {% block content %}
 <style>
-  :root{
-    --col-gap: 22px;
-    --row-gap: 16px;
-    --pad: 1.25rem;
-  }
-  .card-pad{ padding: var(--pad); }
+  :root{ --col-gap:22px; --row-gap:16px; --pad:1.25rem; }
+  .card-pad{ padding:var(--pad); }
   .muted{ color:var(--muted); }
-  .hr{ border:0; border-top:1px solid var(--border); margin: 14px 0 }
+  .hr{ border:0; border-top:1px solid var(--border); margin:14px 0 }
 
   .form-grid{
-    display:grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--row-gap) var(--col-gap);
-    align-items:start;
+    display:grid; grid-template-columns:1fr 1fr 1fr;
+    gap:var(--row-gap) var(--col-gap); align-items:start;
   }
-  .span-2{ grid-column: span 2; }
-
-  .place-start{ justify-self:start; }
-  .nudge-right-12{ margin-left:12px; }
-  .nudge-right-16{ margin-left:16px; }
-  .nudge-right-20{ margin-left:20px; }
-  .nudge-left-12 { margin-left:-12px; }
-
-  @media (max-width: 1024px){
-    .form-grid{ grid-template-columns: 1fr; }
-    .span-2{ grid-column: auto; }
-    .nudge-right-12,.nudge-right-16,.nudge-right-20,.nudge-left-12{ margin-left:0; }
+  .span-2{ grid-column:span 2; }
+  @media (max-width:1024px){
+    .form-grid{ grid-template-columns:1fr; }
+    .span-2{ grid-column:auto; }
   }
 
   .fg{ display:flex; flex-direction:column; gap:8px; }
   .lbl{ font-size:.92rem; color:var(--muted); display:flex; align-items:center; gap:.6rem; }
 
   .ctl{
-    width:100%;
-    border:1px solid var(--border);
-    border-radius:.6rem;
-    padding:.65rem .8rem;
-    min-height:44px;
-    background:#fff;
+    width:100%; min-height:44px;
+    border:1px solid var(--border); border-radius:.6rem;
+    padding:.65rem .8rem; background:#fff;
   }
-  textarea.ctl{ min-height: 120px; }
-
-  .ctl-fat-narrow{
-    width:auto;
-    border:1px solid var(--border);
-    border-radius:.6rem;
-    padding:.65rem .8rem;
-    min-height:44px;
-    background:#fff;
-  }
+  .ctl-inline{ width:auto; }
   .ctl-slim{ padding:.5rem .65rem; min-height:40px; }
+  textarea.ctl{ min-height:120px; }
 
+  .w-36{ width:9rem; }
   .narrow-300{ min-width:260px; max-width:300px; }
-  .narrow-280{ min-width:240px; max-width:280px; }
-  .ph-soft::placeholder{ opacity:.45; color: var(--muted); }
   .obs-narrow{ width:auto; max-width:560px; }
-
-  @media (max-width: 1024px){
-    .ctl-fat-narrow,.ctl-slim{ width:100%; min-width:0; max-width:100%; }
-    .narrow-300,.narrow-280{ min-width:0; max-width:100%; }
-    .obs-narrow{ max-width:100%; }
+  @media (max-width:1024px){
+    .narrow-300,.obs-narrow{ max-width:100%; }
   }
 
-  .link-mini{
-    font-size:.85rem;
-    border:1px solid var(--border);
-    padding:.25rem .55rem;
-    border-radius:.5rem;
-    background:#fff;
-    cursor:pointer;
-  }
-  .link-mini:hover{ background:#f8fafc; }
-
+  .row{ display:flex; gap:8px; align-items:center; }
   .bar{ display:flex; gap:12px; align-items:center; justify-content:space-between }
-  table.wfull{ width:100%; font-size:.925rem; }
+
+  table.wfull{ width:100%; font-size:.925rem; border-collapse:collapse; }
   thead th{ background:#f8fafc; font-weight:600; }
   th,td{ text-align:left; padding:.65rem .75rem; border-bottom:1px solid var(--border); }
 </style>
 
 <section class="space-y-6">
-
-  <!-- FORM -->
+  <!-- ===== Card: Nueva calificación ===== -->
   <div class="card card-pad">
     <div class="bar">
       <div>
@@ -102,42 +64,49 @@
     <hr class="hr">
 
     <div class="form-grid">
-      <!-- Fila 1 -->
       <div class="fg">
-        <div class="lbl">RUT</div>
+        <label class="lbl" for="cm_rut">RUT</label>
         <input id="cm_rut" class="ctl" placeholder="11.111.111-1">
       </div>
 
-      <div class="fg place-start nudge-right-12">
-        <div class="lbl">Tipo de instrumento</div>
-        <select id="cm_tipo" class="ctl-fat-narrow narrow-300">
+      <div class="fg">
+        <label class="lbl" for="cm_tipo">Tipo de instrumento</label>
+        <select id="cm_tipo" class="ctl ctl-inline narrow-300">
           <option value="">Selecciona…</option>
           <option>Factura</option>
           <option>Boleta</option>
           <option>Nota de crédito</option>
+          <option>Otro</option>
         </select>
       </div>
 
-      <div class="fg nudge-left-12">
-        <div class="lbl">Folio</div>
-        <input id="cm_folio" class="ctl-fat-narrow ctl-slim narrow-280 ph-soft" placeholder="F-12345">
+      <div class="fg">
+        <label class="lbl" for="cm_folio">Folio</label>
+        <input id="cm_folio" class="ctl ctl-inline" placeholder="F-12345">
       </div>
 
-      <!-- Fila 2 -->
       <div class="fg">
-        <div class="lbl">Razón social</div>
+        <label class="lbl" for="cm_razon">Razón social</label>
         <input id="cm_razon" class="ctl" placeholder="Empresa SpA">
       </div>
 
-      <div class="fg place-start nudge-right-16">
+      <!-- Monto + Moneda -->
+      <div class="fg">
         <div class="lbl">Monto (<span class="fx-label"></span>)</div>
-        <input id="cm_monto" class="ctl-fat-narrow narrow-300" inputmode="decimal" placeholder="0">
-        <!-- Preview SIEMPRE en USD -->
-        <p id="monto_fx_preview" class="text-sm text-[color:var(--muted)] mt-1">≈ 0 USD</p>
+        <div class="row">
+          <input id="cm_monto" class="ctl ctl-inline narrow-300" inputmode="decimal" placeholder="0">
+          <select id="cm_moneda" class="ctl ctl-inline ctl-slim w-36">
+            <option value="CLP">CLP</option>
+            <option value="USD">USD</option>
+            <option value="PEN">PEN</option>
+            <option value="COP">COP</option>
+          </select>
+        </div>
+        <p id="monto_fx_preview" class="text-sm muted mt-1">≈ 0,00 USD</p>
       </div>
 
-      <div class="fg nudge-left-12">
-        <div class="lbl">Estado de validación</div>
+      <div class="fg">
+        <label class="lbl" for="cm_estado">Estado de validación</label>
         <select id="cm_estado" class="ctl">
           <option value="">Selecciona…</option>
           <option value="Válida">Válida</option>
@@ -146,31 +115,29 @@
         </select>
       </div>
 
-      <!-- Fila 3 -->
       <div class="fg">
         <div class="lbl">
           Período (YYYY-MM)
-          <button type="button" class="link-mini"
-            onclick="(function(){
-              const d=new Date(), m=('0'+(d.getMonth()+1)).slice(-2);
-              document.getElementById('cm_periodo').value=d.getFullYear()+'-'+m;
-            })()">Mes actual</button>
+          <button type="button" class="btn-ghost ctl-slim" style="margin-left:.5rem"
+            onclick="(function(){const d=new Date();const m=('0'+(d.getMonth()+1)).slice(-2);document.getElementById('cm_periodo').value=d.getFullYear()+'-'+m;})()">
+            Mes actual
+          </button>
         </div>
         <input id="cm_periodo" class="ctl" placeholder="2025-12">
       </div>
 
-      <div class="fg span-2 nudge-right-20">
-        <div class="lbl">Observaciones</div>
+      <div class="fg span-2">
+        <label class="lbl" for="cm_obs">Observaciones</label>
         <textarea id="cm_obs" class="ctl obs-narrow" placeholder="Notas opcionales…"></textarea>
       </div>
     </div>
   </div>
 
-  <!-- ÚLTIMOS CREADOS -->
+  <!-- ===== Card: Últimos creados ===== -->
   <div class="card card-pad">
     <div class="bar" style="margin-bottom:6px">
       <h3 class="text-base font-semibold m-0">Últimos creados</h3>
-      <a href="busqueda.html" class="btn-ghost">Ir a Búsqueda / Filtrado</a>
+      <a href="{% url 'busqueda' %}" class="btn-ghost">Ir a Búsqueda / Filtrado</a>
     </div>
 
     <div class="overflow-x-auto">
@@ -187,7 +154,9 @@
             <th>Creado</th>
           </tr>
         </thead>
-        <tbody id="cm_last_tbody"></tbody>
+        <tbody id="cm_last_tbody"
+               data-url-create="/api/ratings/"
+               data-url-list="/api/ratings/?ordering=-created_at"></tbody>
       </table>
     </div>
   </div>
@@ -197,189 +166,278 @@
 {% block extra_js %}
 <script>
 (function(){
-  // ====== Moneda / locales ======
-  function currentCur(){
-    const sel = document.getElementById('fx_selector');
-    return (sel?.value || (window.NUAMX_FX?.current) || 'CLP').toUpperCase();
-  }
-  function supportsCents(code){
-    code = (code||'CLP').toUpperCase();
-    return (code === 'USD' || code === 'PEN'); // CLP/COP sin decimales
-  }
-  function localeForCurrency(code){
-    code = (code||'CLP').toUpperCase();
-    if (code === 'USD') return 'en-US';
-    if (code === 'PEN') return 'es-PE';
-    if (code === 'COP') return 'es-CO';
-    return 'es-CL'; // CLP
-  }
+  'use strict';
 
-  // ====== Caret helpers ======
+  /* ===================== Helpers UI ===================== */
+  function toast(msg, type){
+    const t=document.createElement('div');
+    t.textContent=msg;
+    t.className='fixed bottom-4 right-4 bg-white border border-gray-200 shadow-xl rounded-lg px-2.5 py-1.5 text-sm z-[9999]';
+    if(type==='success') t.classList.add('ring-2','ring-green-200');
+    if(type==='error')   t.classList.add('ring-2','ring-red-200');
+    document.body.appendChild(t); setTimeout(()=>t.remove(),2200);
+  }
+  function inlineErr(text){
+    let e=document.getElementById('cm_inline_err');
+    if(!e){
+      e=document.createElement('div'); e.id='cm_inline_err';
+      e.className='mt-3 text-sm border border-red-300 bg-red-100 text-red-800 rounded-md px-3 py-2';
+      (document.querySelector('.card.card-pad')||document.body).appendChild(e);
+    }
+    e.innerHTML = text || 'Error desconocido';
+  }
+  function clearInlineErr(){ const e=document.getElementById('cm_inline_err'); if(e) e.remove(); }
+
+  /* ===================== FX / Moneda (UI) ===================== */
+  const $moneda = document.getElementById('cm_moneda');
+  const $monto  = document.getElementById('cm_monto');
+  const $hint   = document.getElementById('monto_fx_preview');
+
+  function cur(){ return ($moneda?.value || 'CLP').toUpperCase(); }
+  function isDecimalCurrency(c){ c=String(c||'').toUpperCase(); return (c==='USD' || c==='PEN'); } // con decimales lógicos
+  function setFxLabels(){ document.querySelectorAll('.fx-label').forEach(el=>el.textContent=cur()); }
+
+  // Utilidades caret (por índice de dígitos)
   function digitIndexLeftOfCaret(value, caret){
-    let k=0; for(let i=0;i<Math.min(caret,value.length);i++){ if(/\d/.test(value[i])) k++; } return k;
+    let count=0;
+    for(let i=0;i<Math.min(caret, value.length); i++){ if(/\d/.test(value[i])) count++; }
+    return count;
   }
   function setCaretByDigitIndex(input, k){
-    const v=input.value; let seen=0,pos=v.length;
+    const v=input.value; let seen=0, pos=v.length;
     for(let i=0;i<v.length;i++){ if(/\d/.test(v[i])) seen++; if(seen>=k){ pos=i+1; break; } }
-    try{ input.setSelectionRange(pos,pos); }catch(e){}
+    try{ input.setSelectionRange(pos,pos); }catch(_){}
   }
 
-  // ====== Parse / format (igual que en Carga Masiva) ======
-  // Decimales SOLO si el usuario teclea ',' o '.'
-  function parseMaskedStrictUser(value, allowDecimals, userWantsDecimals){
-    const raw = String(value||'');
-    if(!allowDecimals || !userWantsDecimals){
-      const digits = raw.replace(/[^\d]/g,''); return digits?parseInt(digits,10):0;
-    }
-    const lastSep = Math.max(raw.lastIndexOf(','), raw.lastIndexOf('.'));
-    if(lastSep<0){ const d=raw.replace(/[^\d]/g,''); return d?parseInt(d,10):0; }
-    const left  = raw.slice(0,lastSep).replace(/[^\d]/g,'');
-    const right = raw.slice(lastSep+1).replace(/[^\d]/g,'').slice(0,2);
-    const intN  = left?parseInt(left,10):0;
-    const fracN = right? parseInt(right,10)/Math.pow(10,right.length) : 0;
-    return intN + fracN;
+  // Particionar y formatear en vivo (SOLO miles con punto)
+  function onlyDigits(s){ return String(s||'').replace(/[^\d]/g,''); }
+  function groupThousands(intStr){
+    if(!intStr) return '';
+    return intStr.replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
-  function formatMaskedAuto(n, cur, forceTwo){
-    const loc = localeForCurrency(cur);
-    if(!supportsCents(cur)){
-      return new Intl.NumberFormat(loc,{minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
-    }
-    if(forceTwo){
-      return new Intl.NumberFormat(loc,{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
-    }
-    return new Intl.NumberFormat(loc,{minimumFractionDigits:0,maximumFractionDigits:2}).format(n);
+  function formatLiveInteger(raw){
+    const digits = onlyDigits(raw);
+    return groupThousands(digits);
   }
 
-  // ====== FOLIO con "F-" automático (igual que tenías) ======
-  const $folio = document.getElementById('cm_folio');
-  if($folio){
-    const ensurePrefix = ()=>{
-      if($folio.value === '' || $folio.value === 'F-'){
-        $folio.value = 'F-';
-      }else{
-        $folio.value = $folio.value.replace(/^([fF]-?)+/,'F-');
+  // Formateo al salir:
+  // - CLP/COP → entero con miles
+  // - USD/PEN → entero con miles + ",00"
+  function formatOnBlurByCurrency(raw, currency){
+    const base = formatLiveInteger(raw);
+    if(!base) return '';
+    if(isDecimalCurrency(currency)) return base + ',00';
+    return base;
+  }
+
+  // Parse a número (interpreta coma como decimal si existe)
+  function parseToNumber(formatted){
+    if(!formatted) return 0;
+    const s = String(formatted).replace(/\./g,'').replace(',', '.').replace(/[^\d.]/g,'');
+    const n = Number(s || 0);
+    return (isFinite(n) && !isNaN(n)) ? n : 0;
+  }
+
+  function updateUsdPreview(){
+    const c = cur();
+    let nLocal = parseToNumber($monto.value);
+    try{
+      if(typeof window.fxConvertBetween === 'function'){
+        nLocal = window.fxConvertBetween(nLocal, c, 'USD');
       }
-      const len = $folio.value.length;
-      try{ $folio.setSelectionRange(len, len); }catch(e){}
+    }catch(_){}
+    const txt = new Intl.NumberFormat('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2}).format(nLocal||0);
+    $hint.textContent = '≈ ' + txt + ' USD';
+  }
+
+  // ===== Eventos del input de monto
+  function onInputMoney(e){
+    const el = e.target;
+    const oldVal = el.value;
+    const caret  = el.selectionStart ?? oldVal.length;
+    const kLeft  = digitIndexLeftOfCaret(oldVal, caret);
+
+    // En VIVO SIEMPRE formato entero con miles (puntos), sin coma decimal
+    const neu = formatLiveInteger(oldVal);
+    if(neu !== oldVal){
+      el.value = neu;
+      const totalDigits = (neu.match(/\d/g)||[]).length;
+      const k = Math.min(Math.max(kLeft, 0), totalDigits);
+      setCaretByDigitIndex(el, k);
+    }
+    // No agregamos ",00" en vivo para USD/PEN
+    updateUsdPreview();
+  }
+
+  function onKeyDownMoney(e){
+    // Bloquear ',' y '.' mientras se escribe para TODAS las monedas (requisito actual)
+    if(e.key === ',' || e.key === '.'){ e.preventDefault(); return; }
+  }
+
+  function onPasteMoney(e){
+    // Permitimos pegar cualquier cosa; onInput la dejará solo en dígitos y miles
+    // (no forzamos coma). No hacemos preventDefault aquí.
+  }
+
+  function onBlurMoney(e){
+    e.target.value = formatOnBlurByCurrency(e.target.value, cur());
+    updateUsdPreview();
+  }
+
+  if($monto){
+    $monto.addEventListener('keydown', onKeyDownMoney);
+    $monto.addEventListener('paste',   onPasteMoney);
+    $monto.addEventListener('input',   onInputMoney);
+    $monto.addEventListener('blur',    onBlurMoney);
+  }
+
+  if($moneda){
+    $moneda.addEventListener('change', ()=>{
+      setFxLabels();
+      // Reinterpretar visualmente el valor con las reglas nuevas
+      $monto.value = formatOnBlurByCurrency($monto.value, cur());
+      // Si el usuario vuelve a escribir, se mantendrá solo miles en vivo
+      updateUsdPreview();
+    });
+  }
+  setFxLabels();
+  updateUsdPreview();
+
+  /* ===================== Auth fetch ===================== */
+  async function authFetch(url, opts){ return (window.authFetch ? window.authFetch(url, opts||{}) : fetch(url, opts||{})); }
+
+  /* ===================== Endpoints ===================== */
+  const TB=document.getElementById('cm_last_tbody');
+  const EP_CREATE=(TB?.dataset?.urlCreate)||'';
+  const EP_LIST  =(TB?.dataset?.urlList)||EP_CREATE;
+
+  /* ===================== Normalizadores ===================== */
+  function normRut(r){
+    r=String(r||'').trim().replace(/[^0-9kK]/g,'').toUpperCase();
+    return (!r?'':(r.length>1 && !/-/.test(r)? r.slice(0,-1)+'-'+r.slice(-1) : r));
+  }
+  function normPeriodo(p){
+    const m=String(p||'').trim().match(/^(\d{4})-?(\d{2})$/);
+    return m? (m[1]+'-'+m[2]) : '';
+  }
+
+  /* ===================== Form/validación ===================== */
+  const $rut     = document.getElementById('cm_rut');
+  const $tipo    = document.getElementById('cm_tipo');
+  const $folio   = document.getElementById('cm_folio');
+  const $razon   = document.getElementById('cm_razon');
+  const $estado  = document.getElementById('cm_estado');
+  const $periodo = document.getElementById('cm_periodo');
+  const $obs     = document.getElementById('cm_obs');
+
+  function getFormValues(){
+    // El valor mostrado puede tener ",00" (USD/PEN) tras blur; parseToNumber lo maneja
+    const montoUser = parseToNumber($monto?.value);
+    return {
+      rut: normRut($rut?.value),
+      tipo_instrumento: ($tipo?.value||'').trim(),
+      folio: ($folio?.value||'').trim(),
+      razon_social: ($razon?.value||'').trim(),
+      monto_user: isNaN(montoUser)?0:montoUser,
+      moneda: cur(),
+      estado_validacion: ($estado?.value||'').trim(),
+      periodo: normPeriodo($periodo?.value),
+      observaciones: ($obs?.value||'').trim()
     };
-    $folio.addEventListener('focus', ensurePrefix);
-    $folio.addEventListener('keydown', (e)=>{
-      if (e.key === ' ' || e.code === 'Space'){
-        e.preventDefault();
-        ensurePrefix();
-      }
-    });
-    $folio.addEventListener('input', ()=>{
-      if($folio.value !== ''){
-        $folio.value = $folio.value.replace(/^([fF]-?)+/,'F-');
-      }
-    });
-    $folio.addEventListener('blur', ()=>{
-      if($folio.value === '') $folio.value = 'F-';
-    });
+  }
+  function validar(v){
+    if(!v.rut) return 'RUT es obligatorio (formato 11111111-1).';
+    if(!v.periodo) return 'Período debe ser YYYY-MM (ej: 2025-12).';
+    if(!v.tipo_instrumento) return 'Tipo de instrumento es obligatorio.';
+    if(!v.folio) return 'Folio es obligatorio.';
+    if(!(v.monto_user>0)) return 'Monto debe ser un número mayor a 0.';
+    if(!v.estado_validacion) return 'Estado de validación es obligatorio.';
+    return null;
   }
 
-  // ====== MONTO (misma lógica que Carga Masiva) ======
-  (function(){
-    const $m = document.getElementById('cm_monto');
-    const $p = document.getElementById('monto_fx_preview');
-
-    function wants(){ return $m?.dataset?.hadDecimal === '1'; }
-    function setW(v){ if(!$m) return; if(v) $m.dataset.hadDecimal='1'; else delete $m.dataset.hadDecimal; }
-
-    if($m){
-      // Marca cuando el usuario desea decimales
-      $m.addEventListener('keydown',(e)=>{
-        if(e.key==='.'||e.key===','){ if(supportsCents(currentCur())) setW(true); e.preventDefault(); }
-      });
-      $m.addEventListener('paste',(e)=>{
-        const t=(e.clipboardData?.getData('text')||''); if(/[,.]/.test(t)&&supportsCents(currentCur())) setW(true);
-      });
-    }
-
-    function updatePreviewUSD(){
-      const cur = currentCur();
-      const allow = supportsCents(cur);
-      const n = parseMaskedStrictUser($m.value, allow, wants());
-
-      // Convertir al USD para el preview
-      let outUSD = n;
-      if (window.fxConvertBetween){
-        outUSD = window.fxConvertBetween(n, cur, 'USD');
-      } else if(window.fxConvertAmount && window.NUAMX_FX?.rates?.USD){
-        const fx = window.NUAMX_FX.rates;
-        const clp = n * (fx[cur] || 1);   // n en cur → CLP
-        outUSD = clp / (fx.USD || 1);     // CLP → USD
-      }
-
-      if (window.fxFormat) {
-        $p.textContent = '≈ ' + window.fxFormat(outUSD, 'USD');
-      } else {
-        const v = new Intl.NumberFormat('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}).format(outUSD);
-        $p.textContent = '≈ ' + v + ' USD';
-      }
-    }
-
-    function liveMask(){
-      const cur = currentCur();
-      const allow = supportsCents(cur);
-
-      const old = $m.value;
-      const caret = $m.selectionStart ?? old.length;
-      const wasEnd = (caret === old.length);
-      const kLeft = digitIndexLeftOfCaret(old, caret);
-
-      let n = parseMaskedStrictUser(old, allow, wants());
-      n = allow ? Math.floor(n*100)/100 : Math.trunc(n);
-
-      const neu = formatMaskedAuto(n, cur, false);
-      if(neu !== old){
-        $m.value = neu;
-        requestAnimationFrame(()=>{
-          if (wasEnd){
-            const end = $m.value.length;
-            try{ $m.setSelectionRange(end, end); }catch(e){}
-          }else{
-            const total = ($m.value.match(/\d/g)||[]).length;
-            setCaretByDigitIndex($m, Math.min(Math.max(kLeft,0), total));
-          }
-        });
-      }
-
-      updatePreviewUSD();
-    }
-
-    function onBlur(){
-      const cur = currentCur();
-      const allow = supportsCents(cur);
-      let n = parseMaskedStrictUser($m.value, allow, wants());
-      n = allow ? Math.round(n*100)/100 : Math.trunc(n);
-      $m.value = formatMaskedAuto(n, cur, allow); // si tiene decimales, fija 2; si no, 0
-    }
-
-    if($m && $p){
-      $m.addEventListener('input', liveMask);
-      $m.addEventListener('blur', onBlur);
-
-      document.getElementById('fx_selector')?.addEventListener('change', ()=>{
-        // Si cambias de moneda y la nueva NO tiene decimales, apaga el flag
-        if(!supportsCents(currentCur())) setW(false);
-        liveMask();
-        onBlur();
-      });
-
-      setTimeout(liveMask, 200);
-    }
-  })();
-
-  // ====== Etiquetas de moneda en esta página ======
-  function refreshCurrencyLabels(){
-    const cur = currentCur();
-    document.querySelectorAll('.fx-label').forEach(el=> el.textContent=cur);
+  /* ===================== Últimos creados ===================== */
+  function pintarFila(item){
+    const tr=document.createElement('tr');
+    tr.innerHTML =
+      `<td>${item.rut||'—'}</td>`+
+      `<td>${item.razon_social||item.razon||'—'}</td>`+
+      `<td>${item.periodo||'—'}</td>`+
+      `<td>${item.tipo_instrumento||item.tipo||'—'}</td>`+
+      `<td>${item.folio||'—'}</td>`+
+      `<td>${typeof item.monto==='number'
+            ? new Intl.NumberFormat('es-CL',{minimumFractionDigits:0,maximumFractionDigits:0}).format(item.monto)
+            : (item.monto||'—')}</td>`+
+      `<td>${item.estado_validacion||item.estado||'—'}</td>`+
+      `<td>${item.created_at||item.created||new Date().toISOString()}</td>`;
+    TB.prepend(tr);
   }
-  refreshCurrencyLabels();
-  document.getElementById('fx_selector')?.addEventListener('change', refreshCurrencyLabels);
+  async function cargarUltimos(){
+    TB.innerHTML='';
+    if(!EP_LIST){ TB.innerHTML='<tr><td colspan="8" class="muted">Configura data-url-list o data-url-create.</td></tr>'; return; }
+    try{
+      const url = EP_LIST.includes('?')? EP_LIST : (EP_LIST+'?limit=10');
+      const r = await authFetch(url);
+      if(!r.ok){ TB.innerHTML='<tr><td colspan="8" class="muted">No se pudo listar ('+r.status+').</td></tr>'; return; }
+      const data = await r.json().catch(()=>null);
+      const arr = Array.isArray(data)? data : (data?.results||[]);
+      if(!arr.length){ TB.innerHTML='<tr><td colspan="8" class="muted">Aún no hay calificaciones creadas.</td></tr>'; return; }
+      arr.forEach(pintarFila);
+    }catch(_){
+      TB.innerHTML='<tr><td colspan="8" class="muted">Error de red al listar.</td></tr>';
+    }
+  }
 
+  /* ===================== Guardar / Limpiar ===================== */
+  async function guardar(){
+    clearInlineErr();
+    const v=getFormValues();
+    const err=validar(v);
+    if(err){ inlineErr(err); return; }
+    if(!EP_CREATE){ inlineErr("Configura <code>data-url-create</code> en el &lt;tbody&gt;."); return; }
+
+    // Convertir a CLP (entero) para backend
+    let montoCLP = v.monto_user;
+    try{
+      if(typeof window.fxConvertBetween==='function'){ montoCLP = window.fxConvertBetween(v.monto_user, v.moneda, 'CLP'); }
+      montoCLP = Math.round(Number(montoCLP)||0);
+    }catch(_){ montoCLP = Math.round(Number(v.monto_user)||0); }
+
+    const payload = {
+      rut:v.rut, periodo:v.periodo, tipo_instrumento:v.tipo_instrumento,
+      folio:v.folio, razon_social:v.razon_social||'',
+      monto:montoCLP, estado_validacion:v.estado_validacion,
+      observaciones:v.observaciones||''
+    };
+
+    const btn=document.getElementById('cm_save'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+    try{
+      const resp=await authFetch(EP_CREATE,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+      if(!resp.ok){ const t=await resp.text().catch(()=>'(sin cuerpo)'); inlineErr('No se pudo guardar ('+resp.status+'). '+t); return; }
+      const data=await resp.json().catch(()=>({}));
+      toast('Calificación creada.','success');
+      pintarFila(Object.assign({}, payload, data||{}));
+    }catch(_){
+      inlineErr('Error de red al guardar.');
+    }finally{
+      if(btn){ btn.disabled=false; btn.textContent='💾 Guardar'; }
+    }
+  }
+
+  function limpiar(){
+    ['cm_rut','cm_tipo','cm_folio','cm_razon','cm_monto','cm_estado','cm_periodo','cm_obs'].forEach(id=>{
+      const el=document.getElementById(id); if(!el) return;
+      if(el.tagName==='SELECT') el.selectedIndex=0; else el.value='';
+    });
+    document.getElementById('cm_moneda').value='CLP';
+    setFxLabels();
+    updateUsdPreview();
+    clearInlineErr();
+  }
+
+  document.getElementById('cm_save')?.addEventListener('click', guardar);
+  document.getElementById('cm_clear')?.addEventListener('click', limpiar);
+
+  cargarUltimos();
 })();
 </script>
 {% endblock %}

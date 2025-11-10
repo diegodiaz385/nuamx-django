@@ -98,8 +98,15 @@ USE_TZ = True
 
 # Archivos estáticos y media
 STATIC_URL = "/static/"
+# ⬇️ Mantiene tu carpeta raiz de estáticos (sirve /static/js/reportes_botones.js)
 STATICFILES_DIRS = [BASE_DIR / "web" / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# ⬇️ Finders explícitos para que CalificacionTemplateView pueda usar `finders.find()`
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+]
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -119,4 +126,3 @@ SIMPLE_JWT = {
 
 # Clave por defecto de PK
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-

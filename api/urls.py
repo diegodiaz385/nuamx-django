@@ -1,38 +1,44 @@
-# api/urls.py
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 
-from django.urls import path
 from . import views
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import TokenRefreshView
+
+router = DefaultRouter()
+# Alias en inglés y español apuntando al mismo ViewSet
+router.register(r"ratings", views.CalificacionViewSet, basename="ratings")
+router.register(r"calificaciones", views.CalificacionViewSet, basename="calificaciones")
 
 urlpatterns = [
-    # ------------------
-    # JWT y Autenticación
-    # ------------------
-    path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    # Auth / JWT
+    path("token/", views.EmailOrUsernameTokenView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    path("auth/register/", views.register_view, name="api_register"),
-    path("auth/change-password/", views.change_password_view, name="api_change_password"),
 
-    # --------------------------------
-    # Perfil, Permisos y Roles
-    # --------------------------------
+    # Perfil
     path("me/", views.me_view, name="api_me"),
-    path("me/permissions/", views.my_permissions_view, name="api_me_permissions"),
-    path("roles/", views.roles_list_view, name="api_roles"),
-    path("roles/assign/", views.assign_role_view, name="api_roles_assign"),
+    path("me/password/", views.MePasswordView.as_view(), name="api_me_password"),
 
-    # 🚨 RUTAS AGREGADAS PARA USUARIOS (Listar y Detalle) 🚨
-    # 1. Ruta para Listar (GET) y Crear (POST) -> Usa views.users_list_view con pk=None
-    path("users/", views.users_list_view, name="api_users_list"), 
-    
-    # 2. Ruta para Detalle/Acción (PATCH/DELETE) -> Usa views.users_list_view con pk
-    path("users/<int:pk>/", views.users_list_view, name="api_users_detail"), 
-    
-    # ------------------
-    # Admin
-    # ------------------
-    path("admin/ping/", views.only_admin_example_view, name="api_admin_ping"),
+    # Registro
+    path("auth/register/", views.RegisterView.as_view(), name="api_register"),
+
+    # Usuarios
+    path("users/", views.UsersListView.as_view(), name="api_users_list"),
+    path("users/<int:pk>/", views.UsersDetailView.as_view(), name="api_users_detail"),
+
+    # Roles
+    path("roles/assign/", views.AssignRoleView.as_view(), name="api_roles_assign"),
+
+    # Cambio de contraseña por admin (con flag opcional)
+    path("users/<int:pk>/password/", views.UserPasswordView.as_view(), name="api_user_password"),
+
+    # Carga masiva / utilidades calificaciones
+    path("calificaciones/template/", views.CalificacionTemplateView.as_view(), name="calificaciones_template"),
+    path("calificaciones/import_preview/", views.CalificacionBulkPreviewView.as_view(), name="calificaciones_import_preview"),
+    path("calificaciones/import_commit/", views.CalificacionBulkCommitView.as_view(), name="calificaciones_import_commit"),
+
+    # Export de reportes (XLSX/CSV) con formato bonito
+    path("reportes/export/", views.ReporteExportView.as_view(), name="reportes_export"),
+
+    # Rutas del router (ratings y calificaciones) + acciones del ViewSet
+    path("", include(router.urls)),
 ]

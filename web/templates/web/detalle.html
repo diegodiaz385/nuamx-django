@@ -3,363 +3,657 @@
 {% block html_title %}NUAMX – Detalle / Edición{% endblock %}
 {% block page_title %}Detalle / Edición{% endblock %}
 {% block page_subtitle %}
-<div class="muted">Revisa y edita un registro. Puedes guardar, duplicar, eliminar o exportar a CSV.</div>
+<div class="muted">Lista y edición en la misma vista. Clic en <strong>Razón social</strong> para abrir el detalle.</div>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-  /* ===== LAYOUT NUEVO (FLEX) ===== */
-  .layout{
-    display:flex;
-    gap:14px;
-    width:100%;
-    align-items:flex-start;
-  }
-  .main-col{
-    flex:1 1 0;           /* ocupa todo el espacio disponible */
-    min-width:0;          /* permite que el contenido se encoja sin empujar */
-  }
-  .side-col{
-    flex:0 0 360px;       /* ancho fijo agradable */
-    max-width:420px;
-    min-width:300px;
-  }
-  @media (max-width: 980px){
-    .layout{flex-direction:column;}
-    .side-col{flex:0 0 auto; width:100%; max-width:none; min-width:0;}
+  :root{
+    --bar:#0f172a; --mut:#64748b; --line:#e5e7eb;
+    --bg:#f4f6f8; --card:#ffffff; --soft:#f8fafc;
+    --ok:#16a34a; --warn:#f59e0b; --err:#ef4444;
+    --brand:#2563eb;
   }
 
-  /* Evitar que las cards “empujen” el layout */
-  .card{ min-width:0; }
-
-  .field{display:flex;flex-direction:column;gap:6px}
-  .label{font-weight:600}
-  .input,.select,.textarea{border:1px solid #e5e7eb;border-radius:10px;padding:10px;font:inherit}
-  .textarea{min-height:90px;resize:vertical}
-  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-  @media (max-width: 980px){ .grid2{grid-template-columns:1fr} }
-  .actions{display:flex;gap:8px;flex-wrap:wrap}
-  .badge{display:inline-block;border:1px solid #e5e7eb;border-radius:8px;padding:3px 8px;font-size:.85rem}
+  .page-toolbar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:10px;
+  }
+  .btn{background:var(--brand);color:#fff;border:none;border-radius:10px;padding:10px 14px;cursor:pointer}
+  .btn:hover{filter:brightness(.95)}
+  .btn-sm{padding:6px 12px;min-height:34px;font-size:.92rem}
+  .btn-ghost-sm{padding:6px 12px;min-height:34px;font-size:.92rem;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
+  .btn-ghost-sm:hover{background:var(--soft)}
+  .badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:.85rem;background:#fff}
   .ok{color:#065f46;background:#e8fff2;border-color:#c9f0da}
   .warn{color:#92400e;background:#fff7ed;border-color:#fdebd3}
   .err{color:#991b1b;background:#fee2e2;border-color:#fecaca}
-  .kv{display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px;align-items:center}
+  .muted{color:var(--mut)}
+  .is-hidden{display:none !important;}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .soft{background:var(--soft)}
+  .input,.select,.textarea{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;background:#fff}
+  .input,.select{min-height:42px}
+  .textarea{min-height:110px;resize:vertical}
+
+  .filters{display:grid;grid-template-columns:repeat(7,minmax(140px,1fr));gap:8px}
+  @media (max-width:1100px){ .filters{grid-template-columns:repeat(2,1fr)} }
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse}
+  thead th{position:sticky;top:0;background:var(--soft);border-bottom:1px solid var(--line);font-weight:600}
+  th,td{padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
+  .link{color:var(--brand);text-decoration:none}
+  .link:hover{text-decoration:underline}
+
+  .sheet{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+  @media (max-width:1100px){ .sheet{grid-template-columns:1fr} }
+
+  .sheet-head{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:14px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff, #fafcff)
+  }
+  .id-pill{font-weight:700;color:var(--bar)}
+  .head-kv{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:.92rem;color:var(--bar)}
+  .chip .dot{width:8px;height:8px;border-radius:999px;background:#9ca3af}
+  .chip.ok .dot{background:var(--ok)} .chip.warn .dot{background:var(--warn)} .chip.err .dot{background:var(--err)}
+
+  .section{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;background:#fff}
+  .sec-title{display:flex;align-items:center;gap:10px;margin:0 0 12px 0;font-weight:800;color:var(--bar)}
+  .sec-title .emoji{font-size:1.15rem}
+  .grid{display:grid;gap:12px 16px}
+  .g-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .g-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .g-1{grid-template-columns:1fr}
+  @media (max-width:980px){ .g-2,.g-3{grid-template-columns:1fr} }
+  .field{display:flex;flex-direction:column;gap:6px}
+  .label{font-weight:600;color:#111827}
+  .help{font-size:.86rem;color:var(--mut)}
+
+  /* ===== Moneda bonito, alineado con monto ===== */
+  .money-group{
+    display:grid; grid-template-columns: 1fr 120px; gap:0;
+    border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff;
+  }
+  .money-group .input{ border:none; border-right:1px solid var(--line); border-radius:0; min-height:42px; }
+  .money-group .select{ border:none; border-radius:0; min-height:42px; }
+  .money-foot{ margin-top:6px; color:var(--mut); font-size:.86rem; }
+
+  .summary{position:sticky;top:14px;display:flex;flex-direction:column;gap:12px}
+  .amount-box{border:1px dashed #cbd5e1;background:var(--soft);border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .amount-label{color:var(--mut);font-weight:600}
+  .amount-value{font-size:1.25rem;font-weight:800;color:var(--bar);white-space:nowrap}
+  .kv{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px 10px;align-items:center}
   .kv .k{color:#6b7280}
-  .divider{height:1px;background:#e5e7eb;margin:12px 0}
-  .mini{font-size:.9rem;color:#6b7280}
+  .divider{height:1px;background:var(--line);margin:10px 0}
+
+  .sticky-actions{
+    position:sticky;bottom:0;z-index:5;margin-top:8px;
+    background:linear-gradient(180deg, rgba(255,255,255,.3), #fff);
+    border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;justify-content:flex-end;gap:8px
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Encabezado / atajos -->
-<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-  <div class="muted">Inicio / Detalle</div>
-  <div class="actions">
-    <a href="busqueda.html" class="btn-ghost">← Volver a búsqueda</a>
-    <button class="btn-ghost" type="button" data-api="detail:export">Exportar CSV</button>
-    <button class="btn" type="button" data-api="detail:save">💾 Guardar</button>
+<div class="page-toolbar">
+  <div id="toolbar_left_list">
+    <div class="muted">Clic en <strong>Razón social</strong> para abrir el detalle.</div>
+  </div>
+  <div id="toolbar_left_edit" class="is-hidden">
+    <div class="muted">Editando ID <span id="kv_id">—</span></div>
+  </div>
+
+  <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
+    <button id="btn_back_to_list" class="btn-ghost-sm is-hidden">← Volver a lista</button>
+    <button id="btn_csv_top" class="btn-ghost-sm is-hidden">⬇ Descargar resumen</button>
+    <span id="status_badge" class="badge" style="display:none"></span>
   </div>
 </div>
 
-<div class="layout">
-  <!-- COLUMNA PRINCIPAL -->
-  <section class="card main-col" aria-labelledby="edit-title">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <h3 id="edit-title" style="margin:0">Editar registro</h3>
-      <span id="status_badge" class="badge" style="display:none"></span>
+<section id="screen_list" class="card">
+  <div class="filters" style="margin-bottom:8px">
+    <input id="f_rut" class="input" placeholder="RUT… (icontains)">
+    <input id="f_razon" class="input" placeholder="Razón social… (icontains)">
+    <input id="f_pdesde" class="input" placeholder="Período desde (YYYY-MM)">
+    <input id="f_phasta" class="input" placeholder="Período hasta (YYYY-MM)">
+    <select id="f_tipo" class="select">
+      <option value="">Tipo (todos)</option>
+      <option>Factura</option>
+      <option>Boleta</option>
+      <option>Nota de crédito</option>
+      <option>Otro</option>
+    </select>
+    <select id="f_estado" class="select">
+      <option value="">Estado (todos)</option>
+      <option>Válida</option>
+      <option>Con advertencias</option>
+      <option>Rechazada</option>
+    </select>
+    <select id="f_moneda" class="select">
+      <option value="">Moneda (todas)</option>
+      <option>CLP</option>
+      <option>USD</option>
+      <option>COP</option>
+      <option>PEN</option>
+    </select>
+  </div>
+
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+    <button id="btn_buscar" class="btn">🔎 Buscar</button>
+    <button id="btn_limpiar" class="btn-ghost-sm">🧹 Limpiar</button>
+    <span id="badge_count" class="badge">0 resultados</span>
+  </div>
+
+  <div class="table-wrap" style="max-height:65vh">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>RUT</th>
+          <th>Razón social</th>
+          <th>Período</th>
+          <th>Tipo</th>
+          <th>Folio</th>
+          <th>Monto</th>
+          <th>Moneda</th>
+          <th>Estado</th>
+          <th>Obs</th>
+          <th>Creado</th>
+        </tr>
+      </thead>
+      <tbody id="tbody_list"></tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+    <button id="btn_prev" class="btn-ghost-sm" disabled>⬅ Anterior</button>
+    <div class="muted">Página <span id="page_no">1</span></div>
+    <button id="btn_next" class="btn-ghost-sm" disabled>Siguiente ➡</button>
+  </div>
+</section>
+
+<section id="screen_edit" class="is-hidden">
+  <div class="sheet">
+    <div class="col">
+      <div class="sheet-head">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div class="id-pill">Registro #<span id="kv_id_head">—</span></div>
+          <div class="muted" id="kv_created">—</div>
+        </div>
+        <div class="head-kv">
+          <div class="chip" id="chip_periodo"><span class="dot"></span><span id="kv_periodo">—</span></div>
+          <div class="chip" id="chip_tipo"><span class="dot"></span><span id="kv_tipo">—</span></div>
+          <div class="chip ok" id="chip_estado"><span class="dot"></span><span id="kv_estado">—</span></div>
+          <div class="chip" id="chip_moneda"><span class="dot"></span><span id="kv_moneda">—</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h4 class="sec-title"><span class="emoji">🧾</span> Identificación <small class="muted">Datos base</small></h4>
+        <div class="grid g-2">
+          <div class="field">
+            <label class="label" for="e_rut">RUT / ID</label>
+            <input class="input" id="e_rut" placeholder="11.111.111-1">
+          </div>
+          <div class="field">
+            <label class="label" for="e_razon">Razón social</label>
+            <input class="input" id="e_razon" placeholder="Ejemplo SpA">
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h4 class="sec-title"><span class="emoji">📄</span> Documento <small class="muted">Tipo, folio y monto</small></h4>
+        <div class="grid g-3">
+          <div class="field">
+            <label class="label" for="e_tipo">Tipo</label>
+            <select class="select" id="e_tipo">
+              <option value="">Seleccionar</option>
+              <option>Factura</option>
+              <option>Boleta</option>
+              <option>Nota de crédito</option>
+              <option>Otro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label" for="e_folio">Folio / N° Doc</label>
+            <input class="input" id="e_folio" placeholder="123456">
+          </div>
+
+          <!-- Monto + Moneda juntos, prolijo -->
+          <div class="field">
+            <label class="label" for="e_monto">Monto</label>
+            <div class="money-group">
+              <input type="text" inputmode="numeric" class="input" id="e_monto" placeholder="0">
+              <select class="select" id="e_moneda">
+                <option>CLP</option>
+                <option>USD</option>
+                <option>COP</option>
+                <option>PEN</option>
+              </select>
+            </div>
+            <div class="help money-foot">Formato cambia según moneda.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h4 class="sec-title"><span class="emoji">📅</span> Período y Validación</h4>
+        <div class="grid g-2">
+          <div class="field">
+            <label class="label" for="e_periodo">Período</label>
+            <input class="input" id="e_periodo" placeholder="YYYY-MM (ej: 2025-02)">
+          </div>
+          <div class="field">
+            <label class="label" for="e_estado">Estado de validación</label>
+            <select class="select" id="e_estado">
+              <option value="">Seleccionar</option>
+              <option>Válida</option>
+              <option>Con advertencias</option>
+              <option>Rechazada</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h4 class="sec-title"><span class="emoji">📝</span> Observaciones</h4>
+        <div class="grid g-1">
+          <div class="field">
+            <label class="label" for="e_obs">Notas</label>
+            <textarea class="textarea" id="e_obs" placeholder="Detalle opcional..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-actions">
+        <button id="btn_dup" class="btn-ghost-sm">⧉ Duplicar</button>
+        <button id="btn_csv" class="btn-ghost-sm">⬇ Descargar resumen</button>
+        <button id="btn_del" class="btn-ghost-sm">🗑 Eliminar</button>
+        <button id="btn_save" class="btn">💾 Guardar</button>
+      </div>
     </div>
 
-    <div class="grid2">
-      <div class="field">
-        <label class="label" for="f_rut">RUT / ID</label>
-        <input class="input" id="f_rut" placeholder="11.111.111-1">
+    <aside class="summary">
+      <div class="card soft">
+        <div class="amount-box">
+          <div class="amount-label">Monto</div>
+          <div id="kv_monto" class="amount-value">—</div>
+        </div>
+        <div class="divider"></div>
+        <div class="kv">
+          <div class="k">ID</div><div id="kv_id_bottom">—</div>
+          <div class="k">RUT</div><div id="kv_rut">—</div>
+          <div class="k">Razón</div><div id="kv_razon">—</div>
+        </div>
       </div>
-      <div class="field">
-        <label class="label" for="f_razon">Razón social</label>
-        <input class="input" id="f_razon" placeholder="Ejemplo SpA">
+      <div class="card">
+        <div class="kv">
+          <div class="k">Período</div><div id="kv_periodo_side">—</div>
+          <div class="k">Tipo</div><div id="kv_tipo_side">—</div>
+          <div class="k">Moneda</div><div id="kv_moneda_side">—</div>
+          <div class="k">Estado</div><div id="kv_estado_side">—</div>
+          <div class="k">Creado</div><div id="kv_created_side">—</div>
+        </div>
       </div>
-
-      <div class="field">
-        <label class="label" for="f_periodo">Período</label>
-        <input class="input" id="f_periodo" placeholder="YYYY-MM (ej: 2025-02)">
-      </div>
-      <div class="field">
-        <label class="label" for="f_tipo">Tipo</label>
-        <select class="select" id="f_tipo">
-          <option value="">Seleccionar</option>
-          <option>Factura</option>
-          <option>Boleta</option>
-          <option>Nota de crédito</option>
-          <option>Otro</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label class="label" for="f_folio">Folio / N° Doc</label>
-        <input class="input" id="f_folio" placeholder="123456">
-      </div>
-      <div class="field">
-        <label class="label" for="f_monto">Monto</label>
-        <input type="number" class="input" id="f_monto" placeholder="1500000" min="0" step="1">
-      </div>
-
-      <div class="field">
-        <label class="label" for="f_estado">Estado validación</label>
-        <select class="select" id="f_estado">
-          <option value="">Seleccionar</option>
-          <option>Válida</option>
-          <option>Con advertencias</option>
-          <option>Rechazada</option>
-        </select>
-      </div>
-
-      <div class="field" style="grid-column:1/-1">
-        <label class="label" for="f_obs">Observaciones</label>
-        <textarea class="textarea" id="f_obs" placeholder="Detalle opcional..."></textarea>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="actions">
-      <button class="btn" type="button" data-api="detail:save">💾 Guardar</button>
-      <button class="btn-ghost" type="button" data-api="detail:duplicate">Duplicar</button>
-      <button class="btn-ghost" type="button" data-api="detail:delete">Eliminar</button>
-      <button class="btn-ghost" type="button" data-api="detail:export">Exportar CSV</button>
-    </div>
-    <div class="mini" style="margin-top:6px" id="save_hint"></div>
-  </section>
-
-  <!-- COLUMNA LATERAL -->
-  <aside class="card side-col" aria-labelledby="audit-title">
-    <h3 id="audit-title" style="margin:0 0 8px 0">Resumen / Auditoría</h3>
-    <div class="kv"><div class="k">ID interno</div><div id="kv_id">—</div></div>
-    <div class="kv"><div class="k">Creado</div><div id="kv_created">—</div></div>
-    <div class="kv"><div class="k">Modificado</div><div id="kv_updated">—</div></div>
-    <div class="kv"><div class="k">Usuario</div><div id="kv_user">admin@nuamx.com</div></div>
-    <div class="divider"></div>
-    <div class="kv"><div class="k">Período</div><div id="kv_periodo">—</div></div>
-    <div class="kv"><div class="k">Tipo</div><div id="kv_tipo">—</div></div>
-    <div class="kv"><div class="k">Estado</div><div id="kv_estado">—</div></div>
-    <div class="kv"><div class="k">Monto</div><div id="kv_monto">—</div></div>
-  </aside>
-</div>
+    </aside>
+  </div>
+</section>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 (function(){
-  // ===== Utilidades =====
-  const $ = (s,c=document)=>c.querySelector(s);
-  const fmtCL = (n)=>Number(n||0).toLocaleString('es-CL');
-  const LS_KEY = "nuamx_manual_v1";
+  const $ = s => document.querySelector(s);
+  const doFetch = (u,i)=> (window.authFetch ? authFetch(u,i) : fetch(u,i));
+  const API_BASE = "/api/calificaciones/";
 
-  function getParam(name){
-    const m = new URLSearchParams(location.search).get(name);
-    return (m===null?null:String(m));
+  let PAGE=1, PAGE_SIZE=50;
+  let CURRENT=null, ORIGINAL=null;
+
+  /* ===== Helpers de formato por moneda ===== */
+  function fmtAmount(n, mon){
+    const code = (mon||'CLP').toUpperCase();
+    const num = Number(n||0);
+    if (code==='USD' || code==='PEN'){
+      // Mostrar con coma decimal y miles con punto (asumiendo n en centavos)
+      const parts = (num/100).toFixed(2).split('.');
+      const miles = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+      return `${miles},${parts[1]} ${code}`;
+    }
+    // CLP/COP sin decimales
+    const miles = String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+    return `${miles} ${code}`;
   }
-  function nowStr(){
-    const d = new Date();
-    const f = d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'});
-    const t = d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
-    return `${f} ${t}`;
+  function unformatInput(str, mon){
+    const code = (mon||'CLP').toUpperCase();
+    const s = String(str||'').trim();
+    if (code==='USD' || code==='PEN'){
+      if(!s) return 0;
+      const norm = s.replace(/\./g,'').replace(',', '.');
+      const val = Number(norm);
+      if (isNaN(val)) return 0;
+      return Math.round(val*100);  // centavos
+    } else {
+      const digits = s.replace(/[^\d]/g,'');
+      return Number(digits||0);
+    }
   }
-  function uid(){ return 'id_' + Math.random().toString(36).slice(2,8) + Date.now().toString(36); }
-
-  function loadHist(){
-    try{ const raw = localStorage.getItem(LS_KEY); const arr = raw?JSON.parse(raw):[]; return Array.isArray(arr)?arr:[]; }
-    catch{ return []; }
+  function formatFieldDisplay(inputEl, mon){
+    const raw = inputEl.value;
+    const code = (mon||'CLP').toUpperCase();
+    if (code==='USD' || code==='PEN'){
+      const cents = unformatInput(raw, code);
+      const text = fmtAmount(cents, code).replace(` ${code}`, '');
+      inputEl.value = text;
+      inputEl.placeholder = "1.234,56";
+    } else {
+      const val = unformatInput(raw, code);
+      const text = fmtAmount(val, code).replace(` ${code}`, '');
+      inputEl.value = text;
+      inputEl.placeholder = "1.234.567";
+    }
   }
-  function saveHist(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr||[])); }
 
-  // ===== Estado del registro =====
-  let INDEX = null;   // índice dentro del historial (si vino desde búsqueda)
-  let RECORD = null;  // objeto en edición
+  /* ===== Navegación ===== */
+  function showScreen(name){
+    const isList = (name==='list');
+    $('#screen_list').classList.toggle('is-hidden', !isList);
+    $('#screen_edit').classList.toggle('is-hidden',  isList);
+    $('#toolbar_left_list').classList.toggle('is-hidden', !isList);
+    $('#toolbar_left_edit').classList.toggle('is-hidden',  isList);
+    $('#btn_back_to_list').classList.toggle('is-hidden', isList);
+    $('#btn_csv_top').classList.toggle('is-hidden', isList);
 
-  function demoRecord(){
+    const url = new URL(location.href);
+    if(isList){ url.searchParams.delete('id'); }
+    else if(CURRENT?.id){ url.searchParams.set('id', CURRENT.id); }
+    history.replaceState(null,'',url);
+  }
+  $('#btn_back_to_list').addEventListener('click', ()=>{ CURRENT=ORIGINAL=null; showScreen('list'); loadList(); });
+
+  function statusBadge(text,kind){
+    const el=$('#status_badge'); if(!el)return;
+    if(!text){el.style.display='none';return;}
+    el.textContent=text; el.className='badge';
+    if(kind==='ok')el.classList.add('ok'); if(kind==='warn')el.classList.add('warn'); if(kind==='err')el.classList.add('err');
+    el.style.display=''; setTimeout(()=>{el.style.display='none';},1800);
+  }
+
+  /* ===== Listado ===== */
+  function qsParams(){
+    const p = new URLSearchParams();
+    const rut = $('#f_rut').value.trim();
+    const razon = $('#f_razon').value.trim();
+    const pdesde = $('#f_pdesde').value.trim();
+    const phasta = $('#f_phasta').value.trim();
+    const tipo = $('#f_tipo').value.trim();
+    const estado = $('#f_estado').value.trim();
+    const moneda = $('#f_moneda').value.trim();
+    if(rut) p.set('rut', rut);
+    if(razon) p.set('razon', razon);
+    if(pdesde) p.set('pdesde', pdesde);
+    if(phasta) p.set('phasta', phasta);
+    if(tipo) p.set('tipo', tipo);
+    if(estado) p.set('estado', estado);
+    if(moneda) p.set('moneda', moneda);
+    p.set('ordering','-created_at');
+    p.set('page', PAGE);
+    p.set('page_size', PAGE_SIZE);
+    return p.toString();
+  }
+  function renderRow(x, idx){
+    const razonFull = (x.razon_social||'');
+    const razonShort = razonFull.slice(0,30) + (razonFull.length>30?'…':'');
+    const obsFull = (x.observaciones||'');
+    const obsShort = obsFull.slice(0,18) + (obsFull.length>18?'…':'');
+    return `
+      <tr data-id="${x.id||x.pk||''}">
+        <td>${((PAGE-1)*PAGE_SIZE)+(idx+1)}</td>
+        <td>${x.rut||''}</td>
+        <td><a href="#" class="link" data-open="${x.id||x.pk||''}" title="${razonFull.replace(/"/g,'&quot;')}">${razonShort}</a></td>
+        <td>${x.periodo||''}</td>
+        <td>${x.tipo_instrumento||''}</td>
+        <td>${x.folio||''}</td>
+        <td>${fmtAmount(x.monto, x.moneda).replace(/ [A-Z]{3}$/, '')}</td>
+        <td>${(x.moneda||'CLP')}</td>
+        <td>${x.estado_validacion||''}</td>
+        <td title="${obsFull.replace(/"/g,'&quot;')}">${obsShort}</td>
+        <td>${x.created_at? (new Date(x.created_at)).toLocaleString("es-CL"): ''}</td>
+      </tr>`;
+  }
+  async function loadList(){
+    $('#tbody_list').innerHTML = '<tr><td colspan="11" class="muted">Cargando…</td></tr>';
+    try{
+      const r = await doFetch(API_BASE + '?' + qsParams());
+      if(!r.ok){ $('#tbody_list').innerHTML=''; statusBadge('No se pudo listar ('+r.status+')','err'); return; }
+      const data = await r.json();
+      const items = Array.isArray(data) ? data : (data.results || []);
+      const total = Array.isArray(data) ? items.length : (data.count ?? items.length);
+      $('#badge_count').textContent = total+' resultados';
+      $('#tbody_list').innerHTML = items.length ? items.map((x,i)=>renderRow(x,i)).join('') : '<tr><td colspan="11" class="muted">Sin resultados.</td></tr>';
+
+      if (!Array.isArray(data) && (typeof data === 'object')) { $('#btn_prev').disabled = !data.previous; $('#btn_next').disabled = !data.next; }
+      else { $('#btn_prev').disabled = PAGE<=1; $('#btn_next').disabled = items.length < PAGE_SIZE; }
+      $('#page_no').textContent = PAGE;
+
+      $('#tbody_list').onclick = async (ev)=>{
+        const a = ev.target.closest('a[data-open]');
+        if(!a) return;
+        ev.preventDefault();
+        await openEdit(a.getAttribute('data-open'));
+      };
+    }catch(e){
+      $('#tbody_list').innerHTML = '';
+      statusBadge('Error de red al listar','err');
+    }
+  }
+
+  /* ===== Detalle ===== */
+  function syncSummary(x){
+    $('#kv_id').textContent = x.id ?? '—';
+    $('#kv_id_head').textContent = x.id ?? '—';
+    $('#kv_id_bottom').textContent = x.id ?? '—';
+    const created = x.created_at ? new Date(x.created_at).toLocaleString("es-CL") : '—';
+    $('#kv_created').textContent = created;
+    $('#kv_created_side').textContent = created;
+    $('#kv_periodo').textContent = x.periodo || '—';
+    $('#kv_periodo_side').textContent = x.periodo || '—';
+    $('#kv_tipo').textContent = x.tipo_instrumento || '—';
+    $('#kv_tipo_side').textContent = x.tipo_instrumento || '—';
+    $('#kv_estado').textContent = x.estado_validacion || '—';
+    $('#kv_estado_side').textContent = x.estado_validacion || '—';
+    $('#kv_moneda').textContent = (x.moneda||'CLP');
+    $('#kv_moneda_side').textContent = (x.moneda||'CLP');
+    $('#kv_monto').textContent = fmtAmount(x.monto, x.moneda);
+    $('#kv_rut').textContent = x.rut || '—';
+    $('#kv_razon').textContent = x.razon_social || '—';
+
+    const chip = $('#chip_estado');
+    chip.classList.remove('ok','warn','err');
+    if(x.estado_validacion==='Válida') chip.classList.add('ok');
+    else if(x.estado_validacion==='Con advertencias') chip.classList.add('warn');
+    else if(x.estado_validacion==='Rechazada') chip.classList.add('err');
+    else chip.classList.add('warn');
+  }
+  function fillForm(x){
+    $('#e_rut').value    = x.rut||'';
+    $('#e_razon').value  = x.razon_social||'';
+    $('#e_periodo').value= x.periodo||'';
+    $('#e_tipo').value   = x.tipo_instrumento||'';
+    $('#e_folio').value  = x.folio||'';
+    $('#e_moneda').value = (x.moneda||'CLP');
+    // pintar el monto con formato según moneda
+    $('#e_monto').value  = '';
+    formatFieldDisplay($('#e_monto'), $('#e_moneda').value);
+    if (x.monto!=null){
+      $('#e_monto').value = fmtAmount(Number(x.monto), $('#e_moneda').value).replace(/ [A-Z]{3}$/,'');
+    }
+    $('#e_estado').value = x.estado_validacion||'';
+    $('#e_obs').value    = x.observaciones||'';
+    syncSummary(x);
+  }
+  function readForm(){
+    const mon = $('#e_moneda').value.trim() || 'CLP';
+    const raw = $('#e_monto').value;
+    const parsed = unformatInput(raw, mon);
+    const montoEntero = (['USD','PEN'].includes(mon)) ? Math.round(parsed) : parsed;
     return {
-      _id: uid(),
-      ts: nowStr(),
-      created_at: nowStr(),
-      updated_at: nowStr(),
-      rut:"11.111.111-1",
-      razon:"Ejemplo SpA",
-      periodo:"2025-08",
-      tipo:"Factura",
-      folio:"1001",
-      monto:1200000,
-      estado:"Válida",
-      obs:"OK"
+      rut: $('#e_rut').value.trim(),
+      razon_social: $('#e_razon').value.trim(),
+      periodo: $('#e_periodo').value.trim(),
+      tipo_instrumento: $('#e_tipo').value.trim(),
+      folio: $('#e_folio').value.trim(),
+      monto: Number(montoEntero)||0,
+      moneda: mon,
+      estado_validacion: $('#e_estado').value.trim(),
+      observaciones: $('#e_obs').value.trim()
     };
   }
-
-  function loadRecord(){
-    const idxParam = getParam('idx');
-    const hist = loadHist();
-
-    if(idxParam!==null){
-      const idx = Number(idxParam);
-      if(!isNaN(idx) && hist[idx]){
-        INDEX = idx;
-        RECORD = Object.assign({}, hist[idx]);
-        if(!RECORD._id) RECORD._id = uid();
-        if(!RECORD.created_at) RECORD.created_at = hist[idx].ts || nowStr();
-        if(!RECORD.updated_at) RECORD.updated_at = nowStr();
-        return;
-      }
-    }
-    INDEX = null;
-    RECORD = demoRecord();
-  }
-
-  function renderForm(){
-    if(!RECORD) return;
-    $('#f_rut').value    = RECORD.rut    || '';
-    $('#f_razon').value  = RECORD.razon  || '';
-    $('#f_periodo').value= RECORD.periodo|| '';
-    $('#f_tipo').value   = RECORD.tipo   || '';
-    $('#f_folio').value  = RECORD.folio  || '';
-    $('#f_monto').value  = RECORD.monto  ?? '';
-    $('#f_estado').value = RECORD.estado || '';
-    $('#f_obs').value    = RECORD.obs    || '';
-
-    $('#kv_id').textContent       = RECORD._id || '—';
-    $('#kv_created').textContent  = RECORD.created_at || (RECORD.ts || '—');
-    $('#kv_updated').textContent  = RECORD.updated_at || '—';
-    $('#kv_periodo').textContent  = RECORD.periodo || '—';
-    $('#kv_tipo').textContent     = RECORD.tipo || '—';
-    $('#kv_estado').textContent   = RECORD.estado || '—';
-    $('#kv_monto').textContent    = (RECORD.monto!==undefined)?('$ ' + fmtCL(RECORD.monto)):'—';
-  }
-
-  function statusBadge(text, kind){
-    const el = $('#status_badge'); if(!el) return;
-    if(!text){ el.style.display='none'; return; }
-    el.textContent = text; el.className='badge';
-    if(kind==='ok') el.classList.add('ok');
-    if(kind==='warn') el.classList.add('warn');
-    if(kind==='err') el.classList.add('err');
-    el.style.display='';
-    setTimeout(()=>{ el.style.display='none'; }, 1800);
-  }
-
-  function collect(){
-    const data = {
-      rut:    $('#f_rut').value.trim(),
-      razon:  $('#f_razon').value.trim(),
-      periodo:$('#f_periodo').value.trim(),
-      tipo:   $('#f_tipo').value.trim(),
-      folio:  $('#f_folio').value.trim(),
-      monto:  $('#f_monto').value.trim(),
-      estado: $('#f_estado').value.trim(),
-      obs:    $('#f_obs').value.trim()
-    };
+  function validate(d){
     const errs = [];
-    if(!data.rut) errs.push('RUT/ID');
-    if(!data.razon) errs.push('Razón social');
-    if(!/^\d{4}-\d{2}$/.test(data.periodo||'')) errs.push('Período (YYYY-MM)');
-    if(!data.tipo) errs.push('Tipo');
-    if(!data.folio) errs.push('Folio');
-    if(isNaN(Number(data.monto)) || Number(data.monto)<0) errs.push('Monto');
-    if(!data.estado) errs.push('Estado');
-
-    return {ok: errs.length===0, errs, data};
+    if(!d.rut) errs.push("RUT");
+    if(!/^\d{4}-\d{2}$/.test(d.periodo||"")) errs.push("Período");
+    if(!d.tipo_instrumento) errs.push("Tipo");
+    if(!d.folio) errs.push("Folio");
+    if(!(d.monto>0)) errs.push("Monto");
+    if(!d.estado_validacion) errs.push("Estado");
+    if(!d.moneda) errs.push("Moneda");
+    return errs;
   }
-
-  function doSave(){
-    const res = collect();
-    if(!res.ok){ statusBadge('Completa: '+res.errs.join(', '), 'err'); return; }
-
-    const hist = loadHist();
-    const now  = nowStr();
-
-    RECORD = {
-      ...RECORD,
-      ...res.data,
-      monto: Number(res.data.monto||0),
-      updated_at: now,
-    };
-    if(!RECORD._id) RECORD._id = uid();
-    if(!RECORD.created_at) RECORD.created_at = now;
-    if(!RECORD.ts) RECORD.ts = RECORD.created_at;
-
-    if(INDEX!==null){
-      hist[INDEX] = RECORD;
-    }else{
-      hist.unshift({ ...RECORD, ts: now });
-      INDEX = 0;
+  async function openEdit(id){
+    try{
+      const r = await doFetch(API_BASE + id + '/');
+      if(!r.ok) throw new Error();
+      const x = await r.json();
+      CURRENT = structuredClone(x);
+      ORIGINAL = structuredClone(x);
+      fillForm(CURRENT);
+      showScreen('edit');
+    }catch(e){
+      statusBadge('No se pudo cargar el detalle','err');
     }
-
-    localStorage.setItem(LS_KEY, JSON.stringify(hist));
-    renderForm();
-    statusBadge('Guardado', 'ok');
-    $('#save_hint').textContent = `Último guardado: ${now}`;
   }
-
-  function doDuplicate(){
-    const res = collect();
-    if(!res.ok){ statusBadge('Completa campos antes de duplicar', 'warn'); return; }
-    const now = nowStr();
-    const copy = {
-      _id: uid(),
-      ts: now,
-      created_at: now,
-      updated_at: now,
-      ...RECORD,
-      ...res.data,
-      monto: Number(res.data.monto||0),
-      obs: (res.data.obs||RECORD.obs||'') + ''
-    };
-    const hist = loadHist();
-    hist.unshift(copy);
-    localStorage.setItem(LS_KEY, JSON.stringify(hist));
-    statusBadge('Duplicado creado', 'ok');
+  async function save(){
+    if(!CURRENT) return;
+    const d = readForm();
+    const errs = validate(d);
+    if(errs.length){ statusBadge('Completa: '+errs.join(', '),'warn'); return; }
+    try{
+      const r = await doFetch(API_BASE + CURRENT.id + '/', {
+        method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(d)
+      });
+      if(!r.ok) throw new Error(await r.text());
+      const x = await r.json();
+      CURRENT = structuredClone(x); ORIGINAL = structuredClone(x);
+      fillForm(CURRENT);
+      statusBadge('Guardado','ok');
+    }catch(e){
+      statusBadge('No se pudo guardar','err');
+    }
   }
-
-  function doDelete(){
-    if(INDEX===null){ statusBadge('Este registro es de ejemplo', 'warn'); return; }
+  async function duplicate(){
+    if(!CURRENT) return;
+    const payload = readForm();
+    const errs = validate(payload);
+    if(errs.length){ statusBadge('Completa: '+errs.join(', '),'warn'); return; }
+    try{
+      const r = await doFetch(API_BASE, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if(!r.ok) throw new Error(await r.text());
+      statusBadge('Duplicado creado','ok');
+    }catch(e){
+      statusBadge('No se pudo duplicar','err');
+    }
+  }
+  async function removeItem(){
+    if(!CURRENT) return;
     if(!confirm('¿Eliminar este registro?')) return;
-    const hist = loadHist();
-    if(hist[INDEX]){
-      hist.splice(INDEX,1);
-      localStorage.setItem(LS_KEY, JSON.stringify(hist));
-      statusBadge('Eliminado', 'ok');
-      setTimeout(()=>{ location.href='busqueda.html'; }, 350);
+    try{
+      const r = await doFetch(API_BASE + CURRENT.id + '/', { method:'DELETE' });
+      if(r.status!==204 && r.status!==200) throw new Error(await r.text());
+      statusBadge('Eliminado','ok');
+      CURRENT=ORIGINAL=null;
+      showScreen('list'); loadList();
+    }catch(e){
+      statusBadge('No se pudo eliminar','err');
     }
   }
-
-  function doExport(){
-    const res = collect();
-    if(!res.ok){ statusBadge('Completa el registro para exportar', 'warn'); return; }
-    const rows = [
-      ['fecha','rut','razon_social','periodo','tipo_instrumento','folio','monto','estado_validacion','observaciones','id_interno'],
-      [RECORD.ts||RECORD.created_at||nowStr(), res.data.rut, res.data.razon, res.data.periodo, res.data.tipo, res.data.folio, res.data.monto, res.data.estado, res.data.obs||'', RECORD._id||'']
-    ];
-    const csv = rows.map(r=>r.map(v=>{
-      const s=String(v??'');
-      return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
-    }).join(',')).join('\n');
-    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download='detalle_registro.csv';
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    statusBadge('CSV exportado', 'ok');
+  function exportResumen(){
+    if(!CURRENT) return;
+    const rows = [[
+      "ID","RUT","Razón social","Período","Tipo","Folio","Monto","Moneda","Estado","Observaciones","Creado"
+    ],[
+      CURRENT.id||'', CURRENT.rut||'', CURRENT.razon_social||'', CURRENT.periodo||'',
+      CURRENT.tipo_instrumento||'', CURRENT.folio||'',
+      (CURRENT.monto!=null? fmtAmount(CURRENT.monto, CURRENT.moneda).replace(/ [A-Z]{3}$/, ''):''), (CURRENT.moneda||'CLP'),
+      CURRENT.estado_validacion||'',
+      (CURRENT.observaciones||'').replace(/\r?\n/g,' '), CURRENT.created_at||''
+    ]];
+    const csv = rows.map(r=>r.map(v=>{ const s=String(v??""); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s; }).join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `resumen_calificacion_${CURRENT.id||'detalle'}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(a.href);
+    statusBadge('Resumen descargado','ok');
   }
 
-  document.addEventListener('click', (e)=>{
-    const b = e.target.closest('[data-api]'); if(!b) return;
-    e.preventDefault();
-    const api = b.getAttribute('data-api');
-    if(api==='detail:save')      return doSave();
-    if(api==='detail:duplicate') return doDuplicate();
-    if(api==='detail:delete')    return doDelete();
-    if(api==='detail:export')    return doExport();
+  /* ===== Wireup ===== */
+  // Monto <-> Moneda (formato dinámico)
+  $('#e_moneda').addEventListener('change', ()=>{
+    formatFieldDisplay($('#e_monto'), $('#e_moneda').value);
+    if (CURRENT){
+      CURRENT.moneda = $('#e_moneda').value;
+      CURRENT.monto  = unformatInput($('#e_monto').value, CURRENT.moneda);
+      syncSummary(CURRENT);
+    }
+  });
+  $('#e_monto').addEventListener('blur', ()=>{
+    formatFieldDisplay($('#e_monto'), $('#e_moneda').value);
+  });
+  $('#e_monto').addEventListener('focus', ()=>{
+    const mon = $('#e_moneda').value;
+    const raw = unformatInput($('#e_monto').value, mon);
+    if (['USD','PEN'].includes((mon||'CLP').toUpperCase())){
+      $('#e_monto').value = (raw/100).toString().replace('.', ',');
+    } else {
+      $('#e_monto').value = String(raw);
+    }
+  });
+  $('#e_monto').addEventListener('input', ()=>{
+    const mon = $('#e_moneda').value;
+    if (['USD','PEN'].includes((mon||'CLP').toUpperCase())){
+      $('#e_monto').value = $('#e_monto').value.replace(/[^\d.,]/g,'');
+    } else {
+      $('#e_monto').value = $('#e_monto').value.replace(/[^\d]/g,'');
+    }
   });
 
-  // Init
-  loadRecord();
-  renderForm();
-  $('#save_hint').textContent = RECORD.updated_at ? `Última modificación: ${RECORD.updated_at}` : '';
+  $('#btn_save').addEventListener('click', save);
+  $('#btn_dup').addEventListener('click', duplicate);
+  $('#btn_del').addEventListener('click', removeItem);
+  $('#btn_csv').addEventListener('click', exportResumen);
+  $('#btn_csv_top').addEventListener('click', exportResumen);
+  document.addEventListener('keydown', (e)=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); save(); } });
+
+  $('#btn_buscar').addEventListener('click', ()=>{ PAGE=1; loadList(); });
+  $('#btn_limpiar').addEventListener('click', ()=>{
+    ['#f_rut','#f_razon','#f_pdesde','#f_phasta'].forEach(s=>$(s).value='');
+    $('#f_tipo').value=''; $('#f_estado').value=''; $('#f_moneda').value='';
+    PAGE=1; loadList();
+  });
+  $('#btn_prev').addEventListener('click', ()=>{ if(PAGE>1){ PAGE--; loadList(); }});
+  $('#btn_next').addEventListener('click', ()=>{ PAGE++; loadList(); });
+
+  (async function init(){
+    await loadList();
+    const url = new URL(location.href);
+    const id = url.searchParams.get('id');
+    if(id){ openEdit(id); } else { showScreen('list'); }
+  })();
 })();
 </script>
 {% endblock %}

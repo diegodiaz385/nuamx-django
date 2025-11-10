@@ -1,331 +1,382 @@
-/* app.js v8 — DEMO funcional sin backend
-   - Usuarios/Roles (localStorage) → add, export, clear, change, remove
-   - Plantilla editable y descargas CSV
-   - Reportes / Búsqueda / Carga masiva (demo)
+/* app.js v16 — Núcleo compartido: authFetch + Bus de eventos + sesión/rol + utilidades
+   - Unifica llamadas a API con refresh automático de JWT.
+   - Publica eventos entre módulos/pestañas: users:changed, calificaciones:changed, reportes:generated, session:changed, etc.
+   - Recarga suave por defecto si no hay listeners de página.
+   - Mantiene helpers y UI toasts existentes de v15.
 */
 (function () {
-  window.NUAMX_VERSION = "v8";
-  const $ = (sel, ctx = document) => ctx.querySelector(sel);
-  const $all = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
+  window.NUAMX_VERSION = "v16";
 
-  // ---------- Utils ----------
-  function toast(msg, type = "info") {
-    try {
-      let t = document.createElement("div");
+  // =========================
+  // Utilidades básicas (UI)
+  // =========================
+  const $  = (s, c=document)=>c.querySelector(s);
+  const $$ = (s, c=document)=>Array.from((c||document).querySelectorAll(s));
+
+  function toast(msg, type="info"){
+    try{
+      const t = document.createElement("div");
       t.textContent = msg;
       t.className = "fixed bottom-4 right-4 bg-white border border-gray-200 shadow-xl rounded-lg px-2.5 py-1.5 text-sm z-[9999]";
-      if (type === "success") t.classList.add("ring-2", "ring-green-200");
-      if (type === "error") t.classList.add("ring-2", "ring-red-200");
-      document.body.appendChild(t);
-      setTimeout(() => t.remove(), 2200);
-    } catch (e) { console.log("[toast]", msg); }
+      if(type==="success") t.classList.add("ring-2","ring-green-200");
+      if(type==="error")   t.classList.add("ring-2","ring-red-200");
+      document.body.appendChild(t); setTimeout(()=>t.remove(), 2200);
+    }catch{ console.log(msg); }
   }
-  function toCSV(rows) {
+
+  function fmtDate(v){
+    if(!v) return "—";
+    try{
+      const d = (v instanceof Date) ? v : new Date(String(v));
+      if (isNaN(d.getTime())) return String(v);
+      // Formato ISO para evitar TZ raras en lista; vistas específicas pueden re-formatear
+      return d.toISOString();
+    }catch{ return "—"; }
+  }
+
+  // CSV helpers usados por Admin/Roles
+  function toCSV(rows){
     return rows.map(r => r.map(v => {
       const s = String(v ?? "");
       if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
       return s;
     }).join(",")).join("\n");
   }
-  function downloadCSV(filename, rows) {
-    const csv = toCSV(rows);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  function downloadCSV(filename, rows){
+    const blob = new Blob([toCSV(rows)], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
   }
-  function navTo(href) { if (href) window.location.href = href; }
 
-  // ---------- Dashboard / Reportes / Búsqueda ----------
-  function handleDownloadUltimasCargas() {
-    const rows = [
-      ["Fecha", "Usuario", "Registros", "Tipo", "Observaciones", "Estado"],
-      ["04-09-2025 10:12", "admin@nuamx.com", 1200, "XLSX", "0 duplicados", "Completado"],
-      ["03-09-2025 18:41", "analista@nuamx.com", 650, "CSV", "12 advertencias (montos)", "Advertencias"],
-      ["02-09-2025 09:02", "admin@nuamx.com", 0, "Manual", "Error de formato", "Fallida"],
-    ];
-    downloadCSV("ultimas_cargas.csv", rows);
-    toast("Se descargó ultimas_cargas.csv", "success");
-  }
-  function handleGenerateReport(periodo) {
-    const now = new Date().toISOString().slice(0, 10);
-    const rows = [
-      ["Generado", now],
-      [],
-      ["RUT", "Razón social", "Periodo", "Tipo", "Folio", "Monto", "Estado"],
-      ["11.111.111-1", "Ejemplo SpA", "2025-02", "Factura", "123456", 1500000, "Válida"],
-      ["22.222.222-2", "Otro Ltda.", "2025-02", "Boleta", "778899", 250000, "Con advertencias"],
-    ];
-    downloadCSV(`reporte_${periodo}.csv`, rows);
-    toast(`Reporte ${periodo} generado`, "success");
-  }
-  function handleSearchDemo() {
-    const rut = $("#f_rut")?.value || "";
-    const nombre = $("#f_nombre")?.value || "";
-    const periodo = $("#f_periodo")?.value || "";
-    const tipo = $("#f_tipo")?.value || "";
-    const estado = $("#f_estado")?.value || "";
-    const folio = $("#f_folio")?.value || "";
-    const montoMin = $("#f_monto_min")?.value || "";
-    const rows = [
-      ["RUT", "Razón social", "Periodo", "Tipo", "Folio", "Monto", "Estado"],
-      ["11.111.111-1", "Ejemplo SpA", "2025-02", "Factura", "123456", 1500000, "Válida"],
-      ["22.222.222-2", "Otro Ltda.", "2025-02", "Boleta", "778899", 250000, "Con advertencias"],
-    ];
-    downloadCSV("resultado_busqueda.csv", rows);
-    toast(`Búsqueda ejecutada. rut=${rut} nombre=${nombre} periodo=${periodo} tipo=${tipo} estado=${estado} folio=${folio} montoMin=${montoMin}`, "success");
+  // Exponer utilidades que otras páginas ya estaban usando implícitamente
+  window.NUAMX = window.NUAMX || {};
+  Object.assign(window.NUAMX, { fmtDate, toast, downloadCSV });
+
+  // =========================
+  // Bus de eventos compartido
+  // =========================
+  const BUS_CH = "nuamx.bus.v1";
+
+  const bc = (function(){
+    try { return new BroadcastChannel(BUS_CH); } catch { return null; }
+  })();
+
+  const listeners = new Map(); // topic -> Set<fn>
+
+  function publish(topic, payload){
+    const msg = { topic, payload, ts: Date.now(), source: "web" };
+    // Local (misma pestaña)
+    (listeners.get(topic) || new Set()).forEach(fn => { try{ fn(payload); }catch{} });
+    // CustomEvent para scripts inline
+    document.dispatchEvent(new CustomEvent("nuamx:"+topic, { detail: payload }));
+    // BroadcastChannel (entre pestañas)
+    if (bc) try{ bc.postMessage(msg); }catch{}
+    // Fallback con localStorage
+    try { localStorage.setItem("__nuamx_bus__", JSON.stringify(msg)); localStorage.removeItem("__nuamx_bus__"); }catch{}
   }
 
-  // ---------- Carga masiva: archivo ----------
-  function handleUploadDemo() {
-    const input = $("#file_masivo");
-    if (!input || !input.files || !input.files.length) { toast("Selecciona un archivo CSV/XLSX primero.", "error"); return; }
-    const file = input.files[0];
-    const resumen = [
-      ["Archivo", file.name],
-      ["Tamaño (KB)", Math.round(file.size / 1024)],
-      ["Registros OK", 1200],
-      ["Advertencias", 12],
-      ["Errores", 0],
-      ["Duplicados", 0],
-    ];
-    downloadCSV("resumen_carga_masiva.csv", resumen);
-    toast("Carga masiva validada (demo). Se descargó el resumen.", "success");
-    input.value = "";
+  function subscribe(topic, fn){
+    if (!listeners.has(topic)) listeners.set(topic, new Set());
+    listeners.get(topic).add(fn);
+    return () => listeners.get(topic)?.delete(fn);
   }
 
-  // ---------- Carga masiva: plantilla editable ----------
-  function toggleTemplate() {
-    const wrap = $("#plantilla_wrap");
-    if (!wrap) { toast("No se encontró la plantilla editable en esta página.", "error"); return; }
-    const isHidden = wrap.hasAttribute("hidden") || wrap.style.display === "none";
-    if (isHidden) {
-      wrap.removeAttribute("hidden");
-      wrap.style.display = "";
-      const tbody = $("#plantilla_table tbody");
-      if (tbody && !tbody.children.length) addTemplateRow();
-      toast("Plantilla editable visible.", "success");
-    } else {
-      wrap.setAttribute("hidden", "");
-      wrap.style.display = "none";
-      toast("Plantilla editable oculta.", "success");
-    }
-  }
-  function addTemplateRow(prefill) {
-    const tpl = $("#tpl_row");
-    const tbody = $("#plantilla_table tbody");
-    if (!tpl || !tbody) return;
-    const node = tpl.content.firstElementChild.cloneNode(true);
-    if (prefill && Array.isArray(prefill)) {
-      const inputs = $all("input, select", node);
-      inputs[0].value = prefill[0] ?? "";
-      inputs[1].value = prefill[1] ?? "";
-      inputs[2].value = prefill[2] ?? "";
-      inputs[3].value = prefill[3] ?? "";
-      inputs[4].value = prefill[4] ?? "";
-      inputs[5].value = prefill[5] ?? "";
-      inputs[6].value = prefill[6] ?? "";
-      inputs[7].value = prefill[7] ?? "";
-    }
-    tbody.appendChild(node);
-  }
-  function clearTemplate() {
-    const tbody = $("#plantilla_table tbody");
-    if (!tbody) return;
-    tbody.innerHTML = "";
-    addTemplateRow();
-    toast("Plantilla limpiada.", "success");
-  }
-  function serializeTemplateToRows() {
-    const tbody = $("#plantilla_table tbody");
-    if (!tbody) return [];
-    const rows = [];
-    rows.push(["rut","razon_social","periodo","tipo_instrumento","folio","monto","estado_validacion","observaciones"]);
-    for (const tr of $all("tr", tbody)) {
-      const cells = $all("td", tr);
-      if (!cells.length) continue;
-      const vals = [];
-      vals.push($("input,select", cells[0])?.value?.trim() || "");
-      vals.push($("input,select", cells[1])?.value?.trim() || "");
-      vals.push($("input,select", cells[2])?.value?.trim() || "");
-      vals.push($("input,select", cells[3])?.value?.trim() || "");
-      vals.push($("input,select", cells[4])?.value?.trim() || "");
-      vals.push($("input,select", cells[5])?.value?.trim() || "");
-      vals.push($("input,select", cells[6])?.value?.trim() || "");
-      vals.push($("input,select", cells[7])?.value?.trim() || "");
-      if (vals.every(v => v === "")) continue;
-      rows.push(vals);
-    }
-    return rows;
-  }
-  function basicValidate(rows) {
-    const header = rows[0] || [];
-    const required = ["rut","razon_social","periodo","tipo_instrumento","folio","monto","estado_validacion","observaciones"];
-    const missing = required.filter((k, i) => (header[i] || "").toLowerCase() !== k);
-    const out = { ok: 0, warnings: 0, errors: 0, duplicates: 0 };
-    if (missing.length) { out.errors++; return { ...out, header_error: `Encabezados inválidos: faltan/orden incorrecto (${missing.join(", ")})` }; }
-    const seenKey = new Set();
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i]; if (!r) continue;
-      const [rut, razon, periodo, tipo, folio, monto, estado] = r;
-      if (!rut || !razon || !periodo || !tipo || !folio || !monto || !estado) { out.errors++; continue; }
-      if (!/^\d{4}-\d{2}$/.test(periodo)) out.warnings++;
-      if (isNaN(Number(monto))) out.warnings++;
-      const key = `${rut}|${periodo}|${tipo}|${folio}`;
-      if (seenKey.has(key)) out.duplicates++; else seenKey.add(key);
-      out.ok++;
-    }
-    return out;
-  }
-  function validateTemplateAndDownloadSummary() {
-    const rows = serializeTemplateToRows();
-    if (rows.length <= 1) { toast("La plantilla está vacía.", "error"); return; }
-    const res = basicValidate(rows);
-    const resumen = [
-      ["Registros OK", res.ok],
-      ["Advertencias", res.warnings],
-      ["Errores", res.errors],
-      ["Duplicados", res.duplicates],
-    ];
-    if (res.header_error) resumen.unshift(["Encabezado", res.header_error]);
-    downloadCSV("resumen_carga_masiva.csv", resumen);
-    toast("Validación completada. Se descargó el resumen.", "success");
-  }
-  function exportTemplateCSV() {
-    const rows = serializeTemplateToRows();
-    if (rows.length <= 1) { toast("No hay filas con datos para exportar.", "error"); return; }
-    downloadCSV("plantilla_editable.csv", rows);
-    toast("Se exportó la plantilla a CSV.", "success");
-  }
-
-  // ---------- Usuarios / Roles (localStorage) ----------
-  const LS_KEY = "nuamx_roles_v1";
-  function validateEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
-  }
-  function seedRoles() {
-    const demo = [{ email: "admin@nuamx.com", role: "Administrador" }];
-    saveRoles(demo);
-    return demo;
-  }
-  function loadRoles() {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return seedRoles();
-      const data = JSON.parse(raw);
-      if (!Array.isArray(data)) return seedRoles();
-      return data;
-    } catch { return seedRoles(); }
-  }
-  function saveRoles(arr) {
-    localStorage.setItem(LS_KEY, JSON.stringify(arr || []));
-  }
-  function renderRoles() {
-    const tbody = $("#roles_tbody");
-    if (!tbody) return;
-    const roles = loadRoles();
-    tbody.innerHTML = "";
-    for (const item of roles) {
-      const tr = document.createElement("tr");
-      tr.className = "border-b last:border-0";
-
-      const tdEmail = document.createElement("td");
-      tdEmail.className = "p-3 break-all";
-      tdEmail.textContent = item.email;
-
-      const tdRole = document.createElement("td");
-      tdRole.className = "p-3";
-      const sel = document.createElement("select");
-      sel.className = "border p-1 rounded";
-      sel.setAttribute("data-role-select", item.email);
-      ["Administrador","Operador","Consulta"].forEach(r => {
-        const opt = document.createElement("option");
-        opt.value = r; opt.textContent = r;
-        if (r === item.role) opt.selected = true;
-        sel.appendChild(opt);
-      });
-      tdRole.appendChild(sel);
-
-      const tdAcc = document.createElement("td");
-      tdAcc.className = "p-3";
-      const btnDel = document.createElement("button");
-      btnDel.className = "btn-ghost";
-      btnDel.textContent = "Quitar";
-      btnDel.setAttribute("data-email", item.email);
-      btnDel.addEventListener("click", () => {
-        const roles = loadRoles().filter(r => r.email.toLowerCase() !== item.email.toLowerCase());
-        saveRoles(roles); renderRoles(); toast("Usuario quitado.", "success");
-      });
-      tdAcc.appendChild(btnDel);
-
-      tr.appendChild(tdEmail); tr.appendChild(tdRole); tr.appendChild(tdAcc);
-      tbody.appendChild(tr);
-    }
-  }
-  function handleRolesAdd() {
-    const email = $("#role_email")?.value?.trim();
-    const role  = $("#role_select")?.value?.trim();
-    if (!validateEmail(email)) { toast("Correo inválido.", "error"); return; }
-    if (!role) { toast("Selecciona un rol.", "error"); return; }
-    const roles = loadRoles();
-    if (roles.some(r => r.email.toLowerCase() === email.toLowerCase())) { toast("Ese usuario ya existe.", "error"); return; }
-    roles.push({ email, role }); saveRoles(roles); renderRoles();
-    $("#role_email").value = ""; $("#role_select").value = "";
-    toast("Usuario asignado.", "success");
-  }
-  function handleRolesExport() {
-    const roles = loadRoles();
-    if (!roles.length) { toast("No hay usuarios para exportar.", "error"); return; }
-    const rows = [["Email","Rol"], ...roles.map(r => [r.email, r.role])];
-    downloadCSV("usuarios_roles.csv", rows);
-    toast("Se exportó usuarios_roles.csv", "success");
-  }
-  function handleRolesClear() {
-    if (!confirm("¿Seguro que quieres limpiar toda la lista de usuarios/roles?")) return;
-    saveRoles([]);
-    renderRoles();
-    toast("Lista vaciada.", "success");
-  }
-
-  if ($("#roles_tbody")) renderRoles();
-
-  // ---------- Enrutador de botones ----------
-  document.addEventListener("click", (ev) => {
-    const btn = ev.target.closest("[data-api]");
-    if (!btn) return;
-    const api = btn.getAttribute("data-api");
-    if (!api) return;
-
-    ev.preventDefault();
-    switch (api) {
-      // Dashboard/Reportes/Búsqueda/Carga masiva
-      case "download:ultimas-cargas": handleDownloadUltimasCargas(); break;
-      case "report:diario":           handleGenerateReport("diario"); break;
-      case "report:semanal":          handleGenerateReport("semanal"); break;
-      case "report:mensual":          handleGenerateReport("mensual"); break;
-      case "search:demo":             handleSearchDemo(); break;
-      case "upload:masiva":           handleUploadDemo(); break;
-
-      // Plantilla
-      case "template:toggle":         toggleTemplate(); break;
-      case "template:add-row":        addTemplateRow(); break;
-      case "template:clear":          clearTemplate(); break;
-      case "template:export":         exportTemplateCSV(); break;
-      case "template:validate":       validateTemplateAndDownloadSummary(); break;
-
-      // Usuarios/Roles
-      case "roles:add":               handleRolesAdd(); break;
-      case "roles:export":            handleRolesExport(); break;
-      case "roles:clear":             handleRolesClear(); break;
-
-      default:
-        toast(`Acción no implementada: ${api}`, "error");
+  // Entradas remotas
+  if (bc) bc.onmessage = (ev)=>{ const {topic, payload} = ev.data || {}; if (topic) publish(topic, payload); };
+  window.addEventListener("storage", (e)=>{
+    if (e.key === "__nuamx_bus__" && e.newValue){
+      try{ const {topic, payload} = JSON.parse(e.newValue)||{}; if(topic) publish(topic, payload); }catch{}
     }
   });
 
-  console.log("NUAMX app loaded", window.NUAMX_VERSION);
+  // Exponer el bus
+  window.NUAMX.bus = { publish, subscribe };
+
+  // =========================
+  // Gestión de tokens
+  // =========================
+  const TOKEN_KEYS   = ["nuamx_token","access","access_token","jwt","token"];
+  const REFRESH_KEYS = ["nuamx_refresh","refresh","refresh_token","token_refresh"];
+
+  const looksLikeJWT = s => (typeof s === "string" && s.split(".").length === 3);
+
+  function readCookie(name) {
+    try {
+      const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+      return m ? decodeURIComponent(m[2]) : null;
+    } catch { return null; }
+  }
+
+  function pickAccessFrom(raw){
+    if (!raw) return null;
+    try{
+      const o = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (o && typeof o === "object") {
+        if (o.access && looksLikeJWT(o.access)) return o.access;
+        if (o.token  && looksLikeJWT(o.token))  return o.token;
+      }
+    }catch{
+      if (looksLikeJWT(raw)) return raw;
+    }
+    return null;
+  }
+
+  function getAccessTokenFromStores(){
+    for (const k of TOKEN_KEYS){
+      const v1 = localStorage.getItem(k); const t1 = pickAccessFrom(v1); if (t1) return t1;
+      const v2 = sessionStorage.getItem(k); const t2 = pickAccessFrom(v2); if (t2) return t2;
+      const v3 = readCookie(k); const t3 = pickAccessFrom(v3); if (t3) return t3;
+    }
+    return null;
+  }
+
+  function getRefreshToken(){
+    for (const k of REFRESH_KEYS){
+      const v1 = localStorage.getItem(k);
+      if (v1 && looksLikeJWT(v1)) return v1;
+      try { const o1 = JSON.parse(v1 || "null"); if (o1 && looksLikeJWT(o1.refresh)) return o1.refresh; }catch{}
+      const v2 = sessionStorage.getItem(k);
+      if (v2 && looksLikeJWT(v2)) return v2;
+      try { const o2 = JSON.parse(v2 || "null"); if (o2 && looksLikeJWT(o2.refresh)) return o2.refresh; }catch{}
+      const v3 = readCookie(k); if (v3 && looksLikeJWT(v3)) return v3;
+    }
+    return null;
+  }
+
+  async function refreshAccess(){
+    const refresh = getRefreshToken();
+    if (!refresh) return null;
+    try{
+      const res = await fetch("/api/token/refresh/", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ refresh })
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const access = data.access || data.token;
+      if (access && looksLikeJWT(access)){
+        localStorage.setItem("nuamx_token", JSON.stringify({ access }));
+        // Dejar también en 'access' por compatibilidad con tu login.html
+        localStorage.setItem("access", access);
+        document.cookie = `access=${access}; Path=/; SameSite=Lax`;
+        publish("session:changed", { kind:"refreshed" });
+        return access;
+      }
+      return null;
+    }catch{ return null; }
+  }
+
+  async function getAccessToken(){
+    const direct = getAccessTokenFromStores();
+    if (direct) return direct;
+    return await refreshAccess();
+  }
+
+  // ===================================
+  // authFetch (único punto de contacto)
+  // ===================================
+  const MUTATING = new Set(["POST","PATCH","PUT","DELETE"]);
+
+  function guessTopicFromUrl(url){
+    try{
+      const u = new URL(url, location.origin);
+      const p = u.pathname;
+      if (/^\/api\/users\/?/i.test(p) || /^\/api\/roles\/assign\/?/i.test(p)) return "users:changed";
+      if (/^\/api\/calificaciones\/?/i.test(p)) {
+        if (/\/import_(preview|commit)\/?$/i.test(p)) return "calificaciones:changed";
+        return "calificaciones:changed";
+      }
+      if (/^\/api\/reportes\/export\/?/i.test(p)) return "reportes:generated";
+      if (/^\/api\/me\/?/i.test(p)) return "session:changed";
+    }catch{}
+    return null;
+  }
+
+  async function authFetch(input, init){
+    const req = typeof input === "string" ? input : (input?.url ?? "");
+    const opts = Object.assign({ method:"GET" }, init || {});
+    const method = (opts.method || "GET").toUpperCase();
+
+    // Añadir Authorization si tenemos token
+    let access = await getAccessToken();
+    const headers = new Headers(opts.headers || {});
+    if (access && !headers.has("Authorization")) headers.set("Authorization", "Bearer " + access);
+    if (!headers.has("Accept")) headers.set("Accept", "application/json, text/plain, */*");
+    opts.headers = headers;
+
+    // Intento #1
+    let res = await fetch(req, opts);
+
+    // Si expira, refrescamos y reintento una vez
+    if (res.status === 401 || res.status === 403){
+      const fresh = await refreshAccess();
+      if (fresh){
+        headers.set("Authorization", "Bearer " + fresh);
+        res = await fetch(req, Object.assign({}, opts, { headers }));
+      }
+    }
+
+    // Emitir eventos en éxito de mutaciones
+    if (res.ok && MUTATING.has(method)){
+      const topic = guessTopicFromUrl(req);
+      if (topic) publish(topic, { url:req, method, status:res.status });
+    }
+
+    return res;
+  }
+
+  // Hacer disponible para todas las vistas (carga-masiva, detalle, admin-roles, reportes)
+  window.authFetch = authFetch;
+
+  // =========================
+  // Perfil / RBAC (compat)
+  // =========================
+  const URLS = window.URLS || window.urls || {};
+  const URL_ME          = URLS.me           || "/api/me/";
+  const URL_LIST        = URLS.users_list   || $("#users_table")?.dataset?.urlList || "/api/users/";
+  const URL_ROLE_ASSIGN = URLS.role_assign  || "/api/roles/assign/";
+  const URL_CREATE      = URLS.register     || "/api/auth/register/";
+  const URL_DETAIL_ZERO = URLS.user_detail0 || "/api/users/0/";
+  const URL_PASS_ZERO   = URLS.user_pass0   || "/api/users/0/password/";
+  const URL_ROLE_OF     = URLS.role_of      || null;
+
+  const usersDetailUrl = (id)=> URL_DETAIL_ZERO.replace(/0\/?$/, String(id)+"/");
+  const userPassUrl    = (id)=> URL_PASS_ZERO ? URL_PASS_ZERO.replace(/\/0(\/|$)/, `/${String(id)}$1`) : null;
+
+  let me = {};
+  let flags = { myRole:'Operador', isAdmin:false, isOper:true, isAuditor:false, isUsuario:false };
+  const norm = (s)=>String(s||"").toLowerCase();
+  const looksAdmin  = (s)=>/\b(superuser|admin|administrador|root)\b/.test(norm(s));
+  const looksOper   = (s)=>/\b(oper|operador|operator|staff|editor)\b/.test(norm(s));
+  const looksAudit  = (s)=>/\b(auditor|audit)\b/.test(norm(s));
+  const looksUser   = (s)=>/\b(usuario|user)\b/.test(norm(s));
+
+  function computeRoleFromMe(m){
+    if (m?.is_superuser === true || String(m?.is_superuser).toLowerCase()==="true") return "Administrador";
+    if (m?.is_staff     === true || String(m?.is_staff).toLowerCase()==="true")     return "Operador";
+    const parts = [];
+    ["role","rol","role_name","role_display","tipo","profile_role"].forEach(k=>m?.[k]&&parts.push(m[k]));
+    if (Array.isArray(m?.groups)) m.groups.forEach(g=>parts.push(typeof g==="string"?g:(g?.name??"")));
+    const blob = parts.filter(Boolean).join(" ");
+    if (looksAdmin(blob)) return "Administrador";
+    if (looksOper(blob))  return "Operador";
+    if (looksAudit(blob)) return "Auditor";
+    if (looksUser(blob))  return "Usuario";
+    return "Operador";
+  }
+  function setFlags(role){
+    flags = { myRole:role, isAdmin:role==="Administrador", isOper:role==="Operador", isAuditor:role==="Auditor", isUsuario:role==="Usuario" };
+    window.NUAMX_RBAC_FLAGS = flags;
+    const badge = $("#rbac_badge"); if (badge) badge.textContent = `Rol: ${role}`;
+    const createCard = $("#create_card"); if (createCard) createCard.style.display = flags.isAdmin ? "" : "none";
+    // informar a vistas
+    document.dispatchEvent(new CustomEvent('nuamx:rbac-ready', { detail: flags }));
+  }
+  async function resolveMe(){
+    try{ me = JSON.parse(localStorage.getItem("me")||"{}")||{}; }catch{ me={}; }
+    try{ const r = await authFetch(URL_ME); if(r?.ok) me = Object.assign({}, me, await r.json()); }catch{}
+    const role = computeRoleFromMe(me);
+    try{ localStorage.setItem("me", JSON.stringify(Object.assign({}, me, {role}))); }catch{}
+    setFlags(role);
+  }
+
+  // Rol por email (cache + endpoint opcional) — compat con Admin/Roles
+  const roleCache = new Map(); // email -> rol
+  function roleFromUser(u){
+    if (u?.email && roleCache.has(u.email)) return roleCache.get(u.email);
+    const r = (u?.role) || (u?.roles && u.roles[0]) || u?.rol || u?.role_name || null;
+    if (u?.email && r) roleCache.set(u.email, r);
+    return r || "Usuario";
+  }
+  async function fetchRoleByEmail(email){
+    if (!email) return null;
+    if (roleCache.has(email)) return roleCache.get(email);
+    if (!URL_ROLE_OF) return null;
+    try{
+      const res = await authFetch(URL_ROLE_OF + (URL_ROLE_OF.includes("?")?"&":"?") + "email=" + encodeURIComponent(email));
+      if(!res.ok) return null;
+      const data = await res.json();
+      const r = data?.role || data?.rol || data?.role_name || null;
+      if (r){ roleCache.set(email, r); return r; }
+      return null;
+    }catch{ return null; }
+  }
+
+  async function hydrateOneRow(tr, id, email){
+    try{
+      const r = await authFetch(usersDetailUrl(id));
+      if (r?.ok){
+        const d = await r.json();
+        const roleLocal  = roleFromUser(d);
+        const roleRemote = roleLocal || await fetchRoleByEmail(d.email||email);
+        const roleFinal  = roleRemote || roleLocal || "Usuario";
+
+        tr.dataset.active = String(!!d.is_active);
+        $(".col-email",tr).textContent   = d.email || email || "—";
+        $(".col-phone",tr).textContent   = d.phone || d.telefono || "—";
+        $(".col-created",tr).textContent = fmtDate(d.created_at || d.date_joined || d.created);
+        $(".col-updated",tr).textContent = fmtDate(d.updated_at || d.modified || d.last_login || d.updated);
+        $(".col-active",tr).innerHTML    = `<span class="pill">${d.is_active ? "Activo" : "Inactivo"}</span>`;
+        $(".col-role",tr).textContent    = roleFinal;
+        const tbtn = tr.querySelector('[data-act="toggle"]'); if (tbtn) tbtn.textContent = d.is_active ? "Desactivar" : "Activar";
+      }else{
+        const r2 = await fetchRoleByEmail(email);
+        if (r2) $(".col-role",tr).textContent = r2;
+      }
+    }catch(_){}
+  }
+
+  // =========================
+  // Auto-actualización suave
+  // =========================
+  // Si una página no se suscribe, hacemos una recarga suave (debounced) del módulo actual.
+  let reloadTimer = null;
+  function softReload(){
+    if (reloadTimer) return;
+    reloadTimer = setTimeout(()=>{ reloadTimer=null; location.reload(); }, 600);
+  }
+
+  // Heurísticas por módulo (no tocan HTML ni agregan JS extra)
+  // Las vistas pueden cancelar llamando preventDefault en el CustomEvent "nuamx:auto-reload"
+  function maybeAutoReload(topic){
+    const ev = new CustomEvent("nuamx:auto-reload", { cancelable:true, detail:{ topic } });
+    document.dispatchEvent(ev);
+    if (ev.defaultPrevented) return; // la página ya maneja la actualización
+    // Si estamos en módulos relativos al topic, recarga suave
+    const p = location.pathname;
+    if (topic.startsWith("users:") && (/usuarios|admin-roles|\/users/i.test(p))) return softReload();
+    if (topic.startsWith("calificaciones:") && (/carga-masiva|detalle|calificaciones/i.test(p))) return softReload();
+    if (topic.startsWith("reportes:") && (/reportes/i.test(p))) return; // descarga no necesita recarga
+  }
+
+  // Suscripciones globales
+  ["users:changed","calificaciones:changed","reportes:generated","session:changed"].forEach(t=>{
+    subscribe(t, ()=> maybeAutoReload(t));
+  });
+
+  // =========================
+  // Boot mínimo para páginas
+  // =========================
+  (async function init(){
+    try{ await resolveMe(); }catch{ setFlags("Operador"); }
+    // Exponer helpers de compat para scripts inline existentes
+    window.NUAMX._compat = {
+      roleCache, roleFromUser, fetchRoleByEmail, hydrateOneRow,
+      usersDetailUrl, userPassUrl, URL_LIST, URL_CREATE, URL_ROLE_ASSIGN
+    };
+  })();
+
+  // =========================
+  // Exportar helpers comunes
+  // =========================
+  window.NUAMX.helpers = Object.assign(window.NUAMX.helpers || {}, {
+    $, $$, fmtDate, toCSV, downloadCSV
+  });
+
+  // Compat: seguir ofreciendo doFetch como en tus plantillas
+  window.doFetch = (url, init) => authFetch(url, init);
+
+  // ========= FIN núcleo =========
 })();

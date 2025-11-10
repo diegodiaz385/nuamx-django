@@ -8,7 +8,6 @@
 
 {% block extra_head %}
 <style>
-  /* ====== Dashboard layout ====== */
   .grid{display:grid;gap:14px}
   .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
   @media (max-width: 980px){ .grid-3{grid-template-columns:1fr} }
@@ -18,76 +17,103 @@
   .kpi .value{font-size:2rem;font-weight:800;color:#111;line-height:1.1}
   .kpi .meta{font-size:.85rem;color:#6b7280}
 
-  .toolbar{display:flex;gap:8px;flex-wrap:wrap}
-  .section-title{font-weight:700;margin:0 0 8px 0}
-  .table-actions{display:flex;gap:8px;align-items:center}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
+  .muted{color:#6b7280}
 
-  /* ====== Accesos rápidos (bonito) ====== */
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px 8px;border-bottom:1px solid #f0f2f4}
+  th{text-align:left;font-size:.9rem;color:#6b7280}
+  td{font-size:.95rem}
+
+  .btn{display:inline-flex;align-items:center;gap:8px;background:#0A6A3B;color:#fff;border-radius:10px;padding:10px 14px}
+  .btn-ghost{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#0A6A3B;border:1px solid #0A6A3B;border-radius:10px;padding:10px 14px}
+
   .quick-grid{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
   @media (max-width: 980px){ .quick-grid{grid-template-columns:1fr} }
   .quick-card{
-    display:flex;gap:12px;align-items:flex-start;
-    text-decoration:none;color:inherit;background:#fff;
+    background:#fff;
     border:1px solid #e5e7eb;border-radius:12px;padding:14px;
-    transition:.16s ease; position:relative; overflow:hidden;
+    transition:.16s ease; position:relative; display:flex; gap:14px; align-items:center;
   }
-  .quick-card:hover{transform:translateY(-2px); box-shadow:0 6px 18px rgba(16,24,40,.08); border-color:#d6e9df}
+  .quick-card:hover{transform:translateY(-2px); box-shadow:0 6px 22px rgba(0,0,0,.06)}
   .quick-icon{
-    width:42px;height:42px;border-radius:50%;
+    width:42px;height:42px; min-width:42px; border-radius:50%;
     display:flex;align-items:center;justify-content:center;
-    background:#E8FFF2; /* tono verde suave */
-    font-size:20px; user-select:none; flex:0 0 42px;
-    border:1px solid #c9f0da;
+    background:#E8FFF2;
+    font-size:22px;
   }
-  .quick-body{display:flex;flex-direction:column;gap:4px}
   .quick-title{font-weight:700}
   .quick-desc{font-size:.9rem;color:#6b7280}
-  .quick-arrow{
-    position:absolute;right:12px;top:50%;transform:translateY(-50%);
-    opacity:.3;font-size:18px;transition:.16s ease;
-  }
-  .quick-card:hover .quick-arrow{opacity:.7; right:10px}
+  .quick-arrow{ position:absolute;right:12px;top:50%;transform:translateY(-50%);opacity:.35 }
+
+  .chart-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
+  .chart-title{font-weight:700;margin-bottom:8px}
+  .chart-wrap{position:relative;height:280px}
 </style>
 {% endblock %}
 
 {% block content %}
+
 <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
   <div class="muted">Inicio / Dashboard</div>
-  <div class="toolbar">
-    <button class="btn-ghost" data-api="report:mensual" type="button">Descargar CSV</button>
-    <a href="{% url 'carga-masiva' %}" class="btn">Nueva carga</a>
+  <div style="display:flex;gap:8px">
+    <a class="btn-ghost" href="#" onclick="exportCSV()" aria-label="Descargar CSV">Descargar CSV</a>
+    <a class="btn" href="{% url 'carga-masiva' %}" aria-label="Nueva carga">Nueva carga</a>
   </div>
 </div>
 
-<section class="grid grid-3">
+<section class="grid grid-3" style="margin-top:14px">
   <div class="card kpi">
     <div class="label">Registros totales</div>
-    <div class="value">12.540</div>
+    <div class="value" id="kpi-total">0</div>
     <div class="meta">Acumulado histórico</div>
   </div>
   <div class="card kpi">
     <div class="label">Errores en últimas cargas</div>
-    <div class="value" style="color:#b91c1c">14</div>
+    <div class="value" id="kpi-errores" style="color:#b91c1c">0</div>
     <div class="meta">Últimos procesos</div>
   </div>
   <div class="card kpi">
     <div class="label">Reportes generados</div>
-    <div class="value">38</div>
+    <div class="value" id="kpi-reportes">0</div>
     <div class="meta">Período reciente</div>
   </div>
 </section>
 
-<section class="card">
+<section class="grid grid-3" style="margin-top:14px">
+  <div class="chart-card">
+    <div class="chart-title">Registros por día (últimos 14 días)</div>
+    <div class="chart-wrap">
+      <canvas id="chartRegistros"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-title">Estados de proceso</div>
+    <div class="chart-wrap">
+      <canvas id="chartEstados"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-title">Tipo de carga</div>
+    <div class="chart-wrap">
+      <canvas id="chartTipos"></canvas>
+    </div>
+  </div>
+</section>
+
+<section class="card" style="margin-top:14px">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
-    <h3 class="section-title">Últimas cargas</h3>
-    <div class="table-actions">
-      <button class="btn-ghost" data-api="download:ultimas-cargas" type="button">Ver todo (CSV)</button>
+    <div class="muted">Últimas cargas</div>
+    <div style="display:flex;gap:8px">
+      <a class="btn-ghost" href="{% url 'reportes' %}">Ver todo (CSV)</a>
       <button class="btn-ghost" type="button" onclick="location.reload()">Actualizar</button>
     </div>
   </div>
 
   <div style="overflow:auto">
-    <table>
+    <table role="table" aria-label="Últimas cargas">
       <thead>
         <tr>
           <th>Fecha</th>
@@ -128,8 +154,7 @@
   </div>
 </section>
 
-<section class="card">
-  <div class="section-title">Accesos rápidos</div>
+<section class="card" style="margin-top:14px">
   <div class="quick-grid" role="list">
     <a class="quick-card" href="{% url 'carga-masiva' %}" role="listitem" aria-label="Cargar archivo">
       <div class="quick-icon">📤</div>
@@ -159,4 +184,120 @@
     </a>
   </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function(){
+  // ===== Helpers Auth: intenta usar JWT si existe; si no, usa cookie de sesión =====
+  function getAccessToken(){
+    const keys = ['nuamx_access','access','jwt_access','token'];
+    for (const k of keys){
+      let v = null;
+      try{ v = localStorage.getItem(k); }catch(e){}
+      if(v){ try{ return JSON.parse(v); } catch(e){ return (v||'').replace(/^"+|"+$/g,''); } }
+    }
+    // fallback cookie "access" (por si lo guardas así)
+    const m = document.cookie.match(/(?:^|;\s*)access=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  function authHeaders(){
+    const h = { "Accept":"application/json" };
+    const t = getAccessToken();
+    if (t) h["Authorization"] = "Bearer " + t;
+    return h;
+  }
+
+  // ====== Estado de gráficos (para reusar y actualizar) ======
+  let lineChart = null, doughnutChart = null, barChart = null;
+
+  function fmt(n){
+    try{ return Number(n||0).toLocaleString('es-CL'); } catch(e){ return n; }
+  }
+
+  function drawOrUpdateCharts(payload){
+    const serie = payload.registros_por_dia || [];
+    const labels14 = serie.map(x => {
+      const p = (x.date||'').split('-'); return p.length===3 ? `${p[2]}/${p[1]}` : x.date;
+    });
+    const dataRegistros = serie.map(x => x.count || 0);
+
+    const est = payload.estados || {};
+    const estadosData = [ est['Válida']||0, est['Con advertencias']||0, est['Rechazada']||0 ];
+
+    const tipos = payload.tipos || {};
+    const tiposData = [ tipos['Factura']||0, tipos['Boleta']||0, tipos['Nota de crédito']||0, tipos['Otro']||0 ];
+
+    // Línea
+    if (!lineChart){
+      lineChart = new Chart(document.getElementById('chartRegistros'), {
+        type: 'line',
+        data: { labels: labels14, datasets: [{ label:'Registros', data: dataRegistros, tension:.35, fill:true }]},
+        options: { maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{beginAtZero:true}} }
+      });
+    } else {
+      lineChart.data.labels = labels14;
+      lineChart.data.datasets[0].data = dataRegistros;
+      lineChart.update();
+    }
+
+    // Dona
+    if (!doughnutChart){
+      doughnutChart = new Chart(document.getElementById('chartEstados'), {
+        type: 'doughnut',
+        data: { labels:['Completado','Advertencias','Fallida'], datasets:[{ data: estadosData }] },
+        options:{ maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+      });
+    } else {
+      doughnutChart.data.datasets[0].data = estadosData;
+      doughnutChart.update();
+    }
+
+    // Barras
+    if (!barChart){
+      barChart = new Chart(document.getElementById('chartTipos'), {
+        type: 'bar',
+        data: { labels:['Factura','Boleta','Nota de crédito','Otro'], datasets:[{ label:'Registros', data: tiposData }] },
+        options:{ maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+      });
+    } else {
+      barChart.data.datasets[0].data = tiposData;
+      barChart.update();
+    }
+  }
+
+  async function loadStats(){
+    const r = await fetch("/api/calificaciones/stats/", {
+      method: "GET",
+      headers: authHeaders(),      // ⬅️ ahora enviamos Bearer si existe
+      credentials: "same-origin"   // ⬅️ y cookie de sesión si aplica
+    });
+    if(!r.ok) throw new Error("stats " + r.status);
+    const data = await r.json();
+
+    // KPIs
+    document.getElementById('kpi-total').textContent   = fmt(data.total_registros || 0);
+    document.getElementById('kpi-errores').textContent = fmt(data.errores_ultimos_14d || 0);
+    // (si luego agregas conteo real de reportes al payload, lo pintas aquí)
+    document.getElementById('kpi-reportes').textContent = fmt(0);
+
+    // Gráficos
+    drawOrUpdateCharts(data);
+  }
+
+  // Primera carga inmediata
+  loadStats().catch(e => console.error(e));
+
+  // ====== Tiempo real por sondeo (5 s) ======
+  setInterval(() => {
+    loadStats().catch(e => console.warn("Refresh stats:", e));
+  }, 5000);
+
+  // Dummy para el botón CSV
+  window.exportCSV = function(){
+    alert('Aquí podrías descargar un CSV del tablero (placeholder).');
+  }
+})();
+</script>
 {% endblock %}

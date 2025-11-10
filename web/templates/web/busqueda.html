@@ -26,7 +26,6 @@
 
 {% block content %}
 <section class="card p-6 space-y-5">
-  <!-- Filtros -->
   <div class="grid-6">
     <input id="f_rut" class="input" placeholder="RUT (ej: 11.111.111-1)">
     <input id="f_razon" class="input" placeholder="Razón social">
@@ -61,7 +60,6 @@
     </div>
   </div>
 
-  <!-- Resultados -->
   <div class="table-wrap">
     <table>
       <thead>
@@ -72,6 +70,7 @@
           <th>Tipo</th>
           <th>Folio</th>
           <th>Monto</th>
+          <th>Moneda</th>
           <th>Estado</th>
           <th>Observaciones</th>
           <th>Creado</th>
@@ -89,9 +88,35 @@
 <script>
 (function(){
   const $ = s => document.querySelector(s);
+  const doFetch = (u,init)=> (window.authFetch ? authFetch(u,init) : fetch(u,init));
 
   const API_LIST = "/api/calificaciones/";
   const API_CSV  = "/api/calificaciones/export_csv/";
+
+  // --- Helpers ---
+  function pickCurrency(row){
+    // Usa el campo que venga desde API; fallback CLP
+    return (row.moneda || row.currency || row.divisa || row.fx || row.fx_code || 'CLP').toString().toUpperCase();
+  }
+  function hasCents(code){
+    code = (code||'').toUpperCase();
+    return (code === 'USD' || code === 'PEN');
+  }
+  function fmtMoneyByCode(amount, code){
+    const n = Number(amount ?? 0);
+    const c = (code||'CLP').toUpperCase();
+    const cents = hasCents(c);
+    try{
+      return new Intl.NumberFormat(
+        // usa un locale ibero para separadores amigables
+        (c==='USD' ? 'en-US' : 'es-CL'),
+        { style:'currency', currency:c, minimumFractionDigits: cents?2:0, maximumFractionDigits: cents?2:0 }
+      ).format(n);
+    }catch(_){
+      // Fallback simple
+      return n.toLocaleString('es-CL', { minimumFractionDigits: cents?2:0, maximumFractionDigits: cents?2:0 });
+    }
+  }
 
   function qsFromFilters(){
     const p = new URLSearchParams();
@@ -111,12 +136,6 @@
     return p;
   }
 
-  function fmtMoney(v){
-    const n = Number(v ?? 0);
-    try{ return n.toLocaleString("es-CL", {style:"currency", currency:"CLP", maximumFractionDigits:0}); }
-    catch{ return n.toFixed(0); }
-  }
-
   function render(rows){
     const tb = $("#tbody");
     const empty = $("#empty");
@@ -131,19 +150,24 @@
     empty.style.display = "none";
     badge.textContent = `${rows.length} resultado${rows.length>1?"s":""}`;
 
-    tb.innerHTML = rows.map(r => `
-      <tr>
-        <td>${r.rut}</td>
-        <td title="${r.razon_social||""}">${r.razon_social||""}</td>
-        <td>${r.periodo}</td>
-        <td>${r.tipo_instrumento}</td>
-        <td>${r.folio}</td>
-        <td>${fmtMoney(r.monto)}</td>
-        <td>${r.estado_validacion}</td>
-        <td title="${r.observaciones||""}">${(r.observaciones||"").slice(0,40)}${(r.observaciones||"").length>40?"…":""}</td>
-        <td>${new Date(r.created_at).toLocaleString("es-CL")}</td>
-      </tr>
-    `).join("");
+    tb.innerHTML = rows.map(r => {
+      const code = pickCurrency(r);
+      const money = fmtMoneyByCode(r.monto, code);
+      const obs = (r.observaciones||"");
+      return `
+        <tr>
+          <td>${r.rut||''}</td>
+          <td title="${r.razon_social||""}">${r.razon_social||""}</td>
+          <td>${r.periodo||''}</td>
+          <td>${r.tipo_instrumento||''}</td>
+          <td>${r.folio||''}</td>
+          <td>${money}</td>
+          <td>${code}</td>
+          <td>${r.estado_validacion||''}</td>
+          <td title="${obs}">${obs.slice(0,40)}${obs.length>40?'…':''}</td>
+          <td>${r.created_at ? new Date(r.created_at).toLocaleString("es-CL") : ''}</td>
+        </tr>`;
+    }).join("");
   }
 
   async function fetchList(){
@@ -152,13 +176,14 @@
     try{
       const q = qsFromFilters();
       const url = q.toString() ? `${API_LIST}?${q.toString()}` : API_LIST;
-      const r = await fetch(url);
+      const r = await doFetch(url);
       if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
       const data = await r.json();
-      render(Array.isArray(data)?data:[]);
+      const arr = Array.isArray(data)?data:(data?.results||[]);
+      render(arr);
     }catch(err){
-      render([]);
       console.error("Error consultando API:", err);
+      render([]);
     }finally{
       busy.style.display = "none";
     }
@@ -173,19 +198,29 @@
     $("#f_estado").value = "";
   }
 
-  function exportCSV(){
+  async function exportCSV(){
     const q = qsFromFilters();
     const url = q.toString() ? `${API_CSV}?${q.toString()}` : API_CSV;
-    // Navegación directa para descargar desde backend
-    window.location.href = url;
+    try{
+      const res = await doFetch(url, { method: "GET" });
+      if(!res.ok){ alert("No se pudo exportar CSV."); return; }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "calificaciones.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    }catch(e){
+      alert("Error al descargar CSV.");
+    }
   }
 
-  // Eventos
   $("#btn_buscar").addEventListener("click", fetchList);
   $("#btn_limpiar").addEventListener("click", () => { clearFilters(); fetchList(); });
   $("#btn_export").addEventListener("click", exportCSV);
 
-  // Enter para buscar desde cualquier input
   document.addEventListener("keydown", (e)=>{
     if(e.key === "Enter"){
       const inForm = e.target.closest(".input, .select");
@@ -193,7 +228,6 @@
     }
   });
 
-  // Carga inicial
   fetchList();
 })();
 </script>

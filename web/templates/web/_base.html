@@ -11,7 +11,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    /* ... (Estilos CSS) ... */
     :root{
       --nuamx:#0A6A3B; --nuamx-dark:#064F2C;
       --ink:#1F2937; --muted:#6B7280; --bg:#F8FAFC; --card:#FFFFFF; --border:#E5E7EB;
@@ -33,18 +32,8 @@
   <header class="h-16 bg-[color:var(--nuamx)] text-white flex items-center px-5 justify-between">
     <div class="font-semibold tracking-wide">NUAMX</div>
     <div class="flex items-center gap-3 text-sm">
-      <div class="flex items-center gap-2">
-        <span class="opacity-90">Moneda:</span>
-        <select id="fx_selector" class="text-[color:#064F2C] bg-white/90 rounded px-2 py-1">
-          <option value="CLP">CLP</option>
-          <option value="COP">COP</option>
-          <option value="PEN">PEN</option>
-          <option value="USD">USD</option>
-        </select>
-      </div>
-
+      <!-- Selector de moneda eliminado -->
       <span id="user-email" class="opacity-90">user@nuamx.com</span>
-
       <a id="logout-btn" class="bg-white/15 px-3 py-1.5 rounded cursor-pointer">Salir</a>
     </div>
   </header>
@@ -60,7 +49,7 @@
         <a href="{% url 'detalle' %}">Detalle / Edición</a>
         <a href="{% url 'reportes' %}">Reportes</a>
         <a href="{% url 'no-inscritos' %}">No inscritos</a>
-        <a href="{% url 'admin-roles' %}">Usuarios / Roles</a>
+        <a id="nav-admin-roles" href="{% url 'admin-roles' %}">Usuarios / Roles</a>
       </nav>
     </aside>
 
@@ -78,35 +67,41 @@
     </main>
   </div>
 
+  <!-- Marca activa en menú -->
   <script>
     (function(){
       const links = document.querySelectorAll('.nav a');
-      const path = location.pathname.replace(/\/+$/, '').split('/').pop() || 'dashboard'; 
-      links.forEach(a => { 
-          const hrefPath = a.getAttribute('href').replace(/\/+$/, '').split('/').pop();
-          if (hrefPath === path) a.classList.add('active'); 
+      const path = location.pathname.replace(/\/+$/, '').split('/').pop() || 'dashboard';
+      links.forEach(a => {
+        const hrefPath = a.getAttribute('href').replace(/\/+$/, '').split('/').pop();
+        if (hrefPath === path) a.classList.add('active');
       });
     })();
   </script>
 
+  <!-- Auth + /api/me + guardia force-password + visibilidad menú -->
   <script>
     (function () {
-      const loginUrl = "{% url 'login' %}";
+      const loginUrl        = "{% url 'login' %}";
       const tokenRefreshUrl = "{% url 'token_refresh' %}";
+      const apiMeUrl        = "{% url 'api_me' %}";
+      const forceUrl        = "{% url 'force_password' %}";
 
-      const publicPaths = ['/login/', '/register/']; 
-      const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
-      const access = localStorage.getItem('access');
+      const path        = location.pathname;
+      const publicPaths = ['/login/', '/register/'];
+      const isPublic    = publicPaths.some(p => path.startsWith(p));
+      const isForcePage = path.startsWith('/force-password/');
+      const access      = localStorage.getItem('access');
 
-      if (!isPublic && !access) {
-        location.href = loginUrl; 
+      if (!isPublic && !isForcePage && !access) {
+        location.href = loginUrl;
         return;
       }
 
       async function refreshTokenOnce() {
         const r = localStorage.getItem('refresh');
         if (!r) return null;
-        const res = await fetch(tokenRefreshUrl, { 
+        const res = await fetch(tokenRefreshUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh: r })
@@ -137,16 +132,51 @@
         return res;
       };
 
-      const meData = JSON.parse(localStorage.getItem('me') || '{}');
-      const emailEl = document.getElementById('user-email');
-      if (emailEl && meData.email) emailEl.textContent = meData.email;
+      (async ()=> {
+        if (isPublic) return;
+
+        try{
+          const res = await (window.authFetch ? authFetch(apiMeUrl) : fetch(apiMeUrl));
+          if (!res.ok) return;
+
+          const me = await res.json();
+          try { localStorage.setItem('me', JSON.stringify(me)); } catch {}
+
+          const emailEl = document.getElementById('user-email');
+          if (emailEl && me.email) emailEl.textContent = me.email;
+
+          if (me.must_change_password && !isForcePage) {
+            location.href = forceUrl;
+            return;
+          }
+
+          const navItem = document.getElementById('nav-admin-roles');
+          if (navItem){
+            const roleStr = String(me.role || me.rol || me.role_name || "").toLowerCase();
+            const groups  = Array.isArray(me.groups) ? me.groups.map(g => (typeof g==="string"?g:(g?.name||""))).join(" ").toLowerCase() : "";
+            const isSuper = (me.is_superuser === true) || String(me.is_superuser).toLowerCase()==="true";
+            const isStaff = (me.is_staff === true)     || String(me.is_staff).toLowerCase()==="true";
+
+            const explicitAuditor = /(^|\b)(auditor)\b/.test(roleStr) || /\bauditor\b/.test(groups);
+            const explicitUsuario = /(^|\b)(usuario|user)\b/.test(roleStr) || /\busuario\b|\buser\b/.test(groups);
+
+            const canSee = isSuper || isStaff ||
+                           /\b(administrador|admin)\b/.test(roleStr) || /\boperador|oper\b/.test(roleStr) ||
+                           /\b(administrador|admin|operador|oper)\b/.test(groups);
+
+            if (!canSee && (explicitAuditor || explicitUsuario)) {
+              navItem.parentElement.removeChild(navItem);
+            }
+          }
+        }catch(_){}
+      })();
 
       function forceLogout() {
         localStorage.removeItem('access');
         localStorage.removeItem('refresh');
         localStorage.removeItem('me');
         document.cookie = 'access=; Max-Age=0; Path=/; SameSite=Lax';
-        location.href = loginUrl; 
+        location.href = loginUrl;
       }
 
       const logoutBtn = document.getElementById('logout-btn');
@@ -154,13 +184,14 @@
     })();
   </script>
 
+  <!-- ===== Sistema FX global (NO QUITADO) ===== -->
   <script>
     (function(){
       const FX_LS_KEY = 'nuamx_fx_current';
       const FX_DEFAULT = 'CLP';
 
       const FX = (window.NUAMX_FX = window.NUAMX_FX || {
-        rates: { CLP: 1, COP: 0.30, PEN: 220, USD: 950 },
+        rates: { CLP:1, USD:971, PEN:288, COP:0.257 },
         current: FX_DEFAULT
       });
 
@@ -262,11 +293,8 @@
           const kDigitsLeft = digitIndexLeftOfCaret(oldVal, caret);
 
           let n = parseMaskedAuto(oldVal, allowDec);
-          if(allowDec){
-            n = Math.floor(n * 100) / 100;
-          }else{
-            n = Math.trunc(n);
-          }
+          if(allowDec){ n = Math.floor(n * 100) / 100; }
+          else{ n = Math.trunc(n); }
 
           const newVal = formatMaskedAuto(n, cur, false);
           if(newVal !== oldVal){
@@ -294,7 +322,6 @@
         el.__money_blur_listener__  = onBlur;
         el.addEventListener('input', liveMask);
         el.addEventListener('blur', onBlur);
-        // Inicial
         setTimeout(liveMask, 0);
       }
 
@@ -306,10 +333,14 @@
       document.addEventListener('DOMContentLoaded', rebindAllMoneyInputs);
       document.addEventListener('nuamx:rebind-money', rebindAllMoneyInputs);
       document.addEventListener('nuamx:fx-changed', rebindAllMoneyInputs);
+
+      // Exponer helpers para vistas
+      window.NUAMX_MONEY = {
+        bindMoneyInput, rebindAllMoneyInputs, parseMaskedAuto, formatMaskedAuto
+      };
     })();
   </script>
-  
-  <script src="{% static 'app.js' %}?v=5"></script>
+
   {% block extra_js %}{% endblock %}
 </body>
 </html>

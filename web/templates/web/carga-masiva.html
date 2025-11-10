@@ -1,377 +1,485 @@
 {% extends "web/_base.html" %}
 
+{% block html_title %}NUAMX – Carga masiva{% endblock %}
 {% block page_title %}Carga masiva{% endblock %}
-{% block page_subtitle %}Sube varias calificaciones de una sola vez (vía API).{% endblock %}
+{% block page_subtitle %}Descarga el formato Excel, complétalo y súbelo para validar. Si todo está OK, confírmalo para crear en la base real.{% endblock %}
+
+{% block extra_head %}
+<style>
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:999px;padding:4px 10px;background:#fff;font-size:.85rem}
+  .table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;table-layout:fixed;font-size:14px}
+  thead th{background:#f8fafc;font-weight:600;border-bottom:1px solid var(--border)}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
+  thead th, tbody td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .input,.select,.textarea{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font:inherit;background:#fff;min-height:32px}
+  .input.text-right{text-align:right}
+  .textarea{white-space:normal;resize:none;line-height:1.25;min-height:32px}
+  .row-actions button{border:1px solid var(--border);background:#fff;border-radius:10px;padding:4px 10px;font-size:13px;white-space:nowrap}
+  .err{color:#991b1b;background:#fee2e2;border-color:#fecaca}
+  .hint{font-size:.9rem;color:var(--muted)}
+
+  /* anchos compactos */
+  table.compact thead th:nth-child(1), table.compact tbody td:nth-child(1){width:110px;}  /* RUT */
+  table.compact thead th:nth-child(2), table.compact tbody td:nth-child(2){width:160px;}  /* Razón social */
+  table.compact thead th:nth-child(3), table.compact tbody td:nth-child(3){width:100px;}  /* Período */
+  table.compact thead th:nth-child(4), table.compact tbody td:nth-child(4){width:118px;}  /* Tipo */
+  table.compact thead th:nth-child(5), table.compact tbody td:nth-child(5){width:95px;}   /* Folio */
+  table.compact thead th:nth-child(6), table.compact tbody td:nth-child(6){width:120px;}  /* Monto */
+  table.compact thead th:nth-child(7), table.compact tbody td:nth-child(7){width:95px;}   /* Moneda */
+  table.compact thead th:nth-child(8), table.compact tbody td:nth-child(8){width:120px;}  /* Estado */
+  table.compact thead th:nth-child(9), table.compact tbody td:nth-child(9){width:170px;white-space:normal;} /* Observaciones */
+  table.compact thead th:nth-child(10), table.compact tbody td:nth-child(10){width:100px;} /* Acciones */
+
+  td > .input, td > .select, td > .textarea { width:100%; box-sizing:border-box; }
+  thead th{white-space:normal; line-height:1.1}
+  .btn[disabled], .btn-ghost[disabled]{opacity:.6; pointer-events:none}
+</style>
+{% endblock %}
 
 {% block content %}
-<style>
-  .card-pad{ padding: 1.25rem; }
-  .muted{ color: var(--muted); }
-  .toolbar{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-  .toolbar .mono-pill{
-    border:1px solid var(--border); background:#fff; border-radius:.6rem;
-    padding:.45rem .6rem; min-height:38px; display:inline-flex; align-items:center;
-  }
-  .toolbar .mono-pill select{ border:0; outline:0; background:transparent; pointer-events:none; }
-  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; }
+<section class="card p-6 space-y-4">
 
-  .table-wrap{ overflow:auto; border:1px solid var(--border); border-radius:.75rem; }
-  table.wfull{ width:100%; border-collapse:collapse; font-size:.94rem; }
-  thead th{ background:#f8fafc; font-weight:600; position:sticky; top:0; z-index:1; }
-  th,td{ padding:.65rem .75rem; border-bottom:1px solid var(--border); text-align:left; }
-  th:nth-child(1){ min-width:120px }
-  th:nth-child(2){ min-width:200px }
-  th:nth-child(3){ min-width:110px }
-  th:nth-child(4){ min-width:160px }
-  th:nth-child(5){ min-width:120px }
-  th:nth-child(6){ min-width:140px }
-  th:nth-child(7){ min-width:160px }
-  th:nth-child(8){ min-width:220px }
-  th:nth-child(9){ min-width:110px }
-
-  .cell-input{
-    width:100%; border:1px solid var(--border); background:#fff;
-    border-radius:.5rem; padding:.45rem .6rem; min-height:38px;
-  }
-  .cell-input--sm{ min-height:36px; padding:.35rem .55rem; }
-</style>
-
-<section class="space-y-6">
-  <div class="card card-pad">
-    <h2 class="text-base font-semibold m-0">Plantilla editable</h2>
-    <p class="muted" style="margin:.25rem 0 1rem 0">
-      Columnas: <b>RUT</b>, <b>Razón social</b>, <b>Período</b>, <b>Tipo</b>, <b>Folio</b>, <b>Monto (<span class="fx-label"></span>)</b>, <b>Estado</b>, <b>Observaciones</b>.
-    </p>
-
-    <div class="toolbar" style="margin-bottom:12px">
-      <span class="muted">Moneda:</span>
-      <!-- Solo display de la moneda (sin cambiar aquí). Se sincroniza con #fx_selector (navbar). -->
-      <span class="mono-pill">
-        <select id="cmv_currency_display">
-          <option>CLP</option><option>USD</option><option>PEN</option><option>COP</option>
-        </select>
-      </span>
-
-      <div class="btn-row" style="margin-left:auto">
-        <button id="cmv_add" class="btn-ghost" type="button">➕ Agregar fila</button>
-        <button id="cmv_validate" class="btn" type="button">✅ Validar</button>
-        <button id="cmv_export" class="btn-ghost" type="button">📥 Exportar CSV</button>
-        <button id="cmv_push" class="btn" type="button">📤 Subir a API</button>
-      </div>
+  <div class="toolbar">
+    <div class="flex items-center gap-3">
+      <button id="btn_add_row" class="btn-ghost" type="button">➕ Agregar fila</button>
+      <a id="btn_template" href="#" class="btn-ghost">⬇ Descargar formato (XLSX)</a>
+      <label class="btn-ghost" style="cursor:pointer">
+        📤 Cargar formato…
+        <input id="file_input" type="file" accept=".xlsx" style="display:none">
+      </label>
+      <button id="btn_preview" class="btn" type="button">✅ Validar</button>
+      <button id="btn_export_xlsx" class="btn-ghost" type="button">⬇ Exportar Excel (XLSX)</button>
+      <button id="btn_commit" class="btn" type="button">📡 Subir a API</button>
     </div>
 
-    <div class="table-wrap">
-      <table class="wfull" id="cmv_table">
-        <thead>
-          <tr>
-            <th>RUT</th>
-            <th>Razón social</th>
-            <th>Período</th>
-            <th>Tipo</th>
-            <th>Folio</th>
-            <th>Monto (<span class="fx-label"></span>)</th>
-            <th>Estado</th>
-            <th>Observaciones</th>
-            <th>—</th>
-          </tr>
-        </thead>
-        <tbody id="cmv_tbody">
-          <!-- Fila inicial -->
-        </tbody>
-      </table>
+    <div class="flex items-center gap-3">
+      <span id="badge_rows" class="pill">0 filas</span>
+      <span id="badge_errors" class="pill">0 errores</span>
+      <span id="busy" class="pill" style="display:none">Procesando…</span>
     </div>
-
-    <p class="muted" style="margin-top:10px">
-      Formato de <b>Período</b>: YYYY-MM. El <b>Monto</b> se máscara automáticamente con separadores de miles según la moneda activa.
-    </p>
   </div>
+
+  <div class="hint">Reglas: <strong>CLP</strong> y <strong>COP</strong> sin decimales; <strong>USD</strong> y <strong>PEN</strong> con <em>coma</em> decimal y hasta 2 decimales.</div>
+
+  <div class="table-wrap">
+    <table id="table_bulk" class="compact">
+      <thead>
+        <tr>
+          <th>RUT</th>
+          <th>Razón social</th>
+          <th>Período</th>
+          <th>Tipo</th>
+          <th>Folio</th>
+          <th>Monto</th>
+          <th>Moneda</th>
+          <th>Estado</th>
+          <th>Observaciones</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tbody_bulk"></tbody>
+    </table>
+  </div>
+
+  <p id="empty" class="muted">Aún no hay filas. Descarga el formato o agrega filas manualmente.</p>
+  <div id="inline_err" class="err pill" style="display:none"></div>
+
 </section>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-try{
 (function(){
-  const $ = (s,c=document)=>c.querySelector(s);
-  const $$ = (s,c=document)=>Array.from(c.querySelectorAll(s));
+  if (window.__NUAMX_CM_BOUND__) return;
+  window.__NUAMX_CM_BOUND__ = true;
 
-  // --- Moneda global (del navbar). Si no existe, CLP.
-  function getCur(){ return (window.NUAMX_FX && window.NUAMX_FX.current) ? window.NUAMX_FX.current : 'CLP'; }
-  function supportsCents(code){ const c=(code||'').toUpperCase(); return (c==='USD'||c==='PEN'); }
-  function refreshFxLabels(){
-    const cur = getCur();
-    $$('.fx-label').forEach(el=> el.textContent = cur);
-    const disp = $('#cmv_currency_display');
-    if(disp){
-      for(const o of disp.options){ o.selected = (o.text === cur); }
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const doFetch = (u,init)=> (window.authFetch ? authFetch(u,init) : fetch(u,init));
+
+  /* ===== helpers de dinero por fila ===== */
+  function supportsCents(code){
+    const c = String(code||'').toUpperCase();
+    return c==='USD' || c==='PEN';
+  }
+  // Live: no miles para no romper caret. CLP/COP enteros; USD/PEN coma y 2 dec.
+  function formatLiveByCurrency(text, code){
+    const allow = supportsCents(code);
+    const s = String(text ?? '').trim();
+    if(!allow){
+      return s.replace(/[^\d]/g,'');
     }
-  }
-  refreshFxLabels();
-  document.getElementById('fx_selector')?.addEventListener('change', ()=>{
-    refreshFxLabels();
-    reformatAllMontos();
-  });
-
-  // ===== helpers caret =====
-  function digitIndexLeftOfCaret(value, caret){
-    let count = 0;
-    for(let i=0;i<Math.min(caret, value.length); i++){
-      if(/\d/.test(value[i])) count++;
+    let raw = s.replace(/[^\d,]/g,'');
+    if(!raw) return '';
+    const first = raw.indexOf(',');
+    if(first !== -1){
+      raw = raw.slice(0, first + 1) + raw.slice(first + 1).replace(/,/g,'');
     }
-    return count;
-  }
-  function setCaretByDigitIndex(input, k){
-    const v = input.value;
-    let seen = 0, pos = v.length;
-    for(let i=0;i<v.length;i++){
-      if(/\d/.test(v[i])) seen++;
-      if(seen >= k){ pos = i+1; break; }
+    const parts = raw.split(',');
+    const L = (parts[0] || '').replace(/[^\d]/g,'');
+    let out = L.replace(/^0+(\d)/,'$1');
+    if(parts.length > 1){
+      const R = (parts[1] || '').replace(/[^\d]/g,'').slice(0,2);
+      out = out || '0';
+      out += R.length ? (',' + R) : ',';
     }
-    requestAnimationFrame(()=>{ try{ input.setSelectionRange(pos,pos); }catch(e){} });
+    return out;
+  }
+  // Blur: completa ,00 si falta para USD/PEN
+  function formatBlurByCurrency(text, code){
+    if(!supportsCents(code)) return (String(text||'').replace(/[^\d]/g,'')) || '';
+    const s = String(text||'').trim();
+    if(!s) return '';
+    if(!s.includes(',')) return s + ',00';
+    const [L, R=''] = s.split(',');
+    if(R === '') return L + ',00';
+    if(R.length === 1) return L + ',' + R + '0';
+    return L + ',' + R.slice(0,2);
   }
 
-  // ===== parse/format robusto =====
-  // Sólo permitimos decimales si la moneda lo admite Y el usuario usó , o .
-  function parseMaskedStrict(value, allowDecimals, userWantsDecimals){
-    const raw = String(value||'');
-    if(!allowDecimals || !userWantsDecimals){
-      const digits = raw.replace(/[^\d]/g,'');
-      return digits ? parseInt(digits,10) : 0;
-    }
-    const lastSep = Math.max(raw.lastIndexOf(','), raw.lastIndexOf('.'));
-    if(lastSep < 0){
-      const digits = raw.replace(/[^\d]/g,'');
-      return digits ? parseInt(digits,10) : 0;
-    }
-    const left  = raw.slice(0,lastSep).replace(/[^\d]/g,'');
-    const right = raw.slice(lastSep+1).replace(/[^\d]/g,'').slice(0,2);
-    const intN  = left ? parseInt(left,10) : 0;
-    const fracN = right ? parseInt(right,10)/Math.pow(10,right.length) : 0;
-    return intN + fracN;
-  }
-  function formatMasked(n, cur, forceTwoDec){
-    if(!supportsCents(cur)){
-      return new Intl.NumberFormat('es-CL',{minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
-    }
-    if(forceTwoDec){
-      return new Intl.NumberFormat('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
-    }
-    return new Intl.NumberFormat('es-CL',{minimumFractionDigits:0,maximumFractionDigits:2}).format(n);
-  }
+  /* ===== estado ===== */
+  let rows = [];
+  const TB = $('#tbody_bulk');
+  const EMPTY = $('#empty');
+  const ERR = $('#inline_err');
 
-  // ====== FOLIO (F-) ======
-  function ensureFPrefix(input){
-    if(!input) return;
-    if(input.value==='' || input.value==='F-'){ input.value='F-'; }
-    else { input.value = input.value.replace(/^([fF]-?)+/,'F-'); }
-    const len = input.value.length;
-    try{ input.setSelectionRange(len,len); }catch(e){}
-  }
-  function bindFolio(input){
-    if(!input || input.dataset.folioBound==='1') return;
-    input.dataset.folioBound='1';
-    input.addEventListener('focus', ()=> ensureFPrefix(input));
-    input.addEventListener('keydown', (e)=>{
-      if(e.key===' '||e.code==='Space'){ e.preventDefault(); ensureFPrefix(input); }
-    });
-    input.addEventListener('input', ()=>{
-      if(input.value!==''){ input.value = input.value.replace(/^([fF]-?)+/,'F-'); }
-    });
-    input.addEventListener('blur', ()=>{ if(input.value.trim()==='') input.value='F-'; });
-  }
+  function setBusy(v){ $('#busy').style.display = v? '':'none'; }
+  function showErr(m){ ERR.style.display=''; ERR.textContent=m||'Error'; }
+  function hideErr(){ ERR.style.display='none'; ERR.textContent=''; }
 
-  // ====== MONTO (máscara) ======
-  function wantsDecimalsForInput(input){ return input?.dataset?.hadDecimal==='1'; }
-  function setWantsDecimalsForInput(input, flag){
-    if(!input) return;
-    if(flag) input.dataset.hadDecimal='1';
-    else delete input.dataset.hadDecimal;
-  }
-  function bindMonto(input){
-    if(!input || input.dataset.montoBound==='1') return;
-    input.dataset.montoBound='1';
-
-    input.addEventListener('keydown', (e)=>{
-      if(e.key===','||e.key==='.' ){
-        const cur=getCur(); if(supportsCents(cur)) setWantsDecimalsForInput(input,true);
-      }
-    });
-    input.addEventListener('paste', (e)=>{
-      const t=(e.clipboardData?.getData('text')||'');
-      if(/[,.]/.test(t)){ const cur=getCur(); if(supportsCents(cur)) setWantsDecimalsForInput(input,true); }
-    });
-
-    function liveMask(){
-      const cur=getCur();
-      const allowDec=supportsCents(cur);
-      const oldVal=input.value;
-      const caret=input.selectionStart ?? oldVal.length;
-      const wasEnd=(caret===oldVal.length);
-      const kDigitsLeft=digitIndexLeftOfCaret(oldVal, caret);
-
-      let n=parseMaskedStrict(oldVal, allowDec, wantsDecimalsForInput(input));
-      if(allowDec){ n=Math.floor(n*100)/100; } else { n=Math.trunc(n); }
-
-      const newVal=formatMasked(n, cur, false);
-      if(newVal!==oldVal){
-        input.value=newVal;
-        requestAnimationFrame(()=>{
-          if(wasEnd){ const end=input.value.length; try{ input.setSelectionRange(end,end);}catch(e){} }
-          else{
-            const totalDigits=(newVal.match(/\d/g)||[]).length;
-            const k=Math.min(Math.max(kDigitsLeft,0),totalDigits);
-            setCaretByDigitIndex(input, k);
-          }
-        });
-      }
-    }
-    function onBlur(){
-      const cur=getCur();
-      const allowDec=supportsCents(cur);
-      let n=parseMaskedStrict(input.value, allowDec, wantsDecimalsForInput(input));
-      if(allowDec){ n=Math.round(n*100)/100; input.value=formatMasked(n, cur, true); }
-      else{ n=Math.trunc(n); input.value=formatMasked(n, cur, false); }
-    }
-
-    input.addEventListener('input', liveMask);
-    input.addEventListener('blur', onBlur);
-    setTimeout(liveMask, 50);
-  }
-  function reformatAllMontos(){
-    $$('#cmv_tbody input[data-col="monto"]').forEach(inp=>{
-      if(!supportsCents(getCur())) setWantsDecimalsForInput(inp,false);
-      inp.dispatchEvent(new Event('input',{bubbles:true}));
-      inp.dispatchEvent(new Event('blur',{bubbles:true}));
-    });
-    refreshFxLabels();
-  }
-
-  // ====== render fila ======
-  function makeRow(data={}){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td><input class="cell-input" data-col="rut" value="${data.rut||''}" placeholder="11.111.111-1"></td>
-      <td><input class="cell-input" data-col="razon_social" value="${data.razon_social||''}" placeholder="Empresa SpA"></td>
-      <td><input class="cell-input cell-input--sm" data-col="periodo" value="${data.periodo||''}" placeholder="YYYY-MM"></td>
-      <td>
-        <select class="cell-input" data-col="tipo_instrumento">
-          <option value="">Selecciona…</option>
-          <option ${data.tipo_instrumento==='Factura'?'selected':''}>Factura</option>
-          <option ${data.tipo_instrumento==='Boleta'?'selected':''}>Boleta</option>
-          <option ${data.tipo_instrumento==='Nota de crédito'?'selected':''}>Nota de crédito</option>
-        </select>
-      </td>
-      <td><input class="cell-input cell-input--sm" data-col="folio" value="${data.folio||'F-'}" placeholder="F-12345"></td>
-      <td><input class="cell-input" data-col="monto" inputmode="decimal" value="${data.monto||'0'}"></td>
-      <td>
-        <select class="cell-input" data-col="estado_validacion">
-          <option value="">Selecciona…</option>
-          <option ${data.estado_validacion==='Válida'?'selected':''}>Válida</option>
-          <option ${data.estado_validacion==='Con advertencias'?'selected':''}>Con advertencias</option>
-          <option ${data.estado_validacion==='Rechazada'?'selected':''}>Rechazada</option>
-        </select>
-      </td>
-      <td><input class="cell-input" data-col="observaciones" value="${data.observaciones||''}" placeholder="Notas…"></td>
-      <td><button class="btn-ghost" data-del type="button">Eliminar</button></td>
-    `;
-    // binds
-    const folio = tr.querySelector('[data-col="folio"]'); bindFolio(folio);
-    const monto = tr.querySelector('[data-col="monto"]'); bindMonto(monto);
-    tr.querySelector('[data-del]')?.addEventListener('click', ()=> tr.remove());
-    return tr;
-  }
-
-  // Fila inicial
-  $('#cmv_tbody').appendChild(makeRow({}));
-
-  // Botones cabecera
-  $('#cmv_add')?.addEventListener('click', ()=> $('#cmv_tbody').appendChild(makeRow({})));
-  $('#cmv_validate')?.addEventListener('click', ()=>{
-    // validaciones mínimas
-    const rows = $$('#cmv_tbody tr');
-    let errs=0;
-    for(const tr of rows){
-      const val=(c)=> tr.querySelector(`[data-col="${c}"]`)?.value?.trim() || '';
-      if(!val('rut') || !val('periodo') || !val('tipo_instrumento') || !val('folio') || !val('monto')){
-        errs++;
-      }
-    }
-    if(errs) alert(`Hay ${errs} fila(s) con campos obligatorios vacíos.`);
-    else alert('Todo OK para enviar.');
-  });
-
-  $('#cmv_export')?.addEventListener('click', ()=>{
-    const rows=$$('#cmv_tbody tr');
-    const cur=getCur();
-    const allowDec=(cur==='USD'||cur==='PEN');
-    const parseForCSV=(v)=>{
-      const raw=String(v||'');
-      if(!allowDec){ const d=raw.replace(/[^\d]/g,''); return d?parseInt(d,10):0; }
-      const lastSep=Math.max(raw.lastIndexOf(','),raw.lastIndexOf('.'));
-      if(lastSep<0){ const d=raw.replace(/[^\d]/g,''); return d?parseInt(d,10):0; }
-      const L=raw.slice(0,lastSep).replace(/[^\d]/g,'');
-      const R=raw.slice(lastSep+1).replace(/[^\d]/g,'').slice(0,2);
-      const i=L?parseInt(L,10):0; const f=R?parseInt(R,10)/Math.pow(10,R.length):0;
-      return +(i+f).toFixed(2);
+  // Fila vacía sin defaults
+  function emptyRow(){
+    return {
+      rut:'', razon_social:'', periodo:'', tipo:'', folio:'',
+      monto:'', moneda:'', estado:'', observaciones:'',
+      tipo_instrumento:'', monto_raw:'',
+      _errors:[]
     };
-    const data=[['rut','razon_social','periodo','tipo_instrumento','folio','monto','moneda','estado_validacion','observaciones']];
-    for(const tr of rows){
-      const val=(c)=> tr.querySelector(`[data-col="${c}"]`)?.value?.trim() || '';
-      data.push([
-        val('rut'), val('razon_social'), val('periodo'), val('tipo_instrumento'),
-        val('folio'), parseForCSV(val('monto')), cur, val('estado_validacion'), val('observaciones')
-      ]);
+  }
+
+  function paint(){
+    TB.innerHTML='';
+    rows.forEach((r,idx)=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td><input class="input" data-f="rut" value="${r.rut||''}" placeholder="11.111.111-1"></td>
+        <td><input class="input" data-f="razon_social" value="${r.razon_social||''}" placeholder="Empresa SpA"></td>
+        <td><input class="input" data-f="periodo" value="${r.periodo||''}" placeholder="YYYY-MM"></td>
+        <td>
+          <select class="select" data-f="tipo">
+            <option value="">Selecciona…</option>
+            <option ${r.tipo==='Factura'?'selected':''}>Factura</option>
+            <option ${r.tipo==='Boleta'?'selected':''}>Boleta</option>
+            <option ${r.tipo==='Nota de crédito'?'selected':''}>Nota de crédito</option>
+            <option ${r.tipo==='Otro'?'selected':''}>Otro</option>
+          </select>
+        </td>
+        <td><input class="input" data-f="folio" value="${r.folio||''}" placeholder="F-123"></td>
+        <td><input class="input text-right" data-money="1" data-f="monto" value="${r.monto||''}" placeholder="0"></td>
+        <td>
+          <select class="select" data-f="moneda">
+            <option value="">Selecciona…</option>
+            <option value="CLP" ${r.moneda==='CLP'?'selected':''}>CLP</option>
+            <option value="USD" ${r.moneda==='USD'?'selected':''}>USD</option>
+            <option value="COP" ${r.moneda==='COP'?'selected':''}>COP</option>
+            <option value="PEN" ${r.moneda==='PEN'?'selected':''}>PEN</option>
+          </select>
+        </td>
+        <td>
+          <select class="select" data-f="estado">
+            <option value="">Selecciona…</option>
+            <option ${r.estado==='Válida'?'selected':''}>Válida</option>
+            <option ${r.estado==='Con advertencias'?'selected':''}>Con advertencias</option>
+            <option ${r.estado==='Rechazada'?'selected':''}>Rechazada</option>
+          </select>
+        </td>
+        <td><textarea class="textarea" rows="1" data-f="observaciones" placeholder="Notas…">${r.observaciones||''}</textarea></td>
+        <td class="row-actions"><button data-act="del" data-idx="${idx}">Eliminar</button></td>`;
+      if(r._errors?.length){ tr.title=r._errors.join(' | '); tr.classList.add('err'); }
+      TB.appendChild(tr);
+    });
+    $$('#tbody_bulk textarea[data-f="observaciones"]').forEach(el=>{
+      el.style.height='auto'; el.style.height=el.scrollHeight+'px';
+    });
+    $('#badge_rows').textContent=`${rows.length} fila${rows.length!==1?'s':''}`;
+    $('#badge_errors').textContent=`${rows.reduce((a,b)=>a+(b._errors?.length||0),0)} errores`;
+    EMPTY.style.display=rows.length?'none':'';
+  }
+
+  /* edición */
+  TB.addEventListener('keydown', e=>{
+    const inp=e.target.closest('input[data-money]'); if(!inp) return;
+    const tr=inp.closest('tr'); const idx=Array.from(TB.children).indexOf(tr);
+    const cur=rows[idx]?.moneda||'';
+    if(supportsCents(cur) && (e.key==='.' || e.key===',')){
+      e.preventDefault();
+      const start = inp.selectionStart ?? inp.value.length;
+      const end   = inp.selectionEnd ?? inp.value.length;
+      const v = inp.value;
+      const before = v.slice(0,start);
+      const after  = v.slice(end);
+      let next = before + ',' + after;
+      next = formatLiveByCurrency(next, cur);
+      inp.value = next;
+      const pos = (before + ',').length;
+      try{ inp.setSelectionRange(pos,pos); }catch(_){}
+      rows[idx].monto = next; rows[idx].monto_raw = next; rows[idx]._errors=[];
     }
-    const csv=data.map(r=>r.map(s=>{
-      const t=String(s); return t.includes(',')?`"${t.replace(/"/g,'""')}"`:t;
+  });
+
+  TB.addEventListener('input', e=>{
+    const el=e.target.closest('input,select,textarea'); if(!el) return;
+    const tr=el.closest('tr'); const idx=Array.from(TB.children).indexOf(tr);
+    const f=el.getAttribute('data-f');
+
+    if(f==='monto' && el.hasAttribute('data-money')){
+      const cur=rows[idx].moneda||'';
+      el.value = formatLiveByCurrency(el.value, cur);
+      rows[idx].monto = el.value;
+      rows[idx].monto_raw = el.value;
+    }else{
+      rows[idx][f] = el.value;
+      if(f==='tipo') rows[idx].tipo_instrumento = el.value;
+      if(f==='observaciones'&&el.tagName==='TEXTAREA'){
+        el.style.height='auto'; el.style.height=el.scrollHeight+'px';
+      }
+    }
+    rows[idx]._errors=[];
+  });
+
+  TB.addEventListener('blur', e=>{
+    const inp=e.target.closest('input[data-money]'); if(!inp) return;
+    const tr=inp.closest('tr'); const idx=Array.from(TB.children).indexOf(tr);
+    const cur=rows[idx].moneda||'';
+    inp.value = formatBlurByCurrency(inp.value, cur);
+    rows[idx].monto = inp.value;
+    rows[idx].monto_raw = inp.value;
+  }, true);
+
+  TB.addEventListener('change', e=>{
+    const sel=e.target.closest('select[data-f="moneda"]'); if(!sel) return;
+    const tr=e.target.closest('tr'); const idx=Array.from(TB.children).indexOf(tr);
+    const cur = sel.value || '';
+    rows[idx].moneda = cur;
+    const money=tr.querySelector('input[data-f="monto"]');
+    if(money){
+      money.value = formatLiveByCurrency(money.value, cur);
+      rows[idx].monto = money.value;
+      rows[idx].monto_raw = money.value;
+    }
+  });
+
+  TB.addEventListener('click', e=>{
+    const b=e.target.closest('button[data-act="del"]'); if(!b) return;
+    const idx=parseInt(b.getAttribute('data-idx'),10); rows.splice(idx,1); paint();
+  });
+
+  $('#btn_add_row').addEventListener('click', ()=>{ rows.push(emptyRow()); paint(); });
+
+  /* descarga plantilla */
+  async function authDownload(url,filename){
+    try{
+      const r=await doFetch(url,{credentials:'include'});
+      if(!r.ok){ showErr('No se pudo descargar la plantilla ('+r.status+').'); return; }
+      const blob=await r.blob();
+      const a=document.createElement('a');
+      const u=URL.createObjectURL(blob);
+      a.href=u; a.download=filename||'plantilla_carga_masiva.xlsx';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+    }catch{ showErr('Error de red al descargar la plantilla.'); }
+  }
+  $('#btn_template').addEventListener('click', ev=>{
+    ev.preventDefault();
+    authDownload('/api/calificaciones/template/','plantilla_carga_masiva.xlsx');
+  });
+
+  /* subir XLSX */
+  function setButtonsDisabled(v){ $('#btn_preview').disabled=v; $('#btn_commit').disabled=v; }
+
+  $('#file_input').addEventListener('change', async ()=>{
+    hideErr();
+    const f=$('#file_input').files[0]; if(!f) return;
+    const fd=new FormData(); fd.append('file',f);
+    setBusy(true); setButtonsDisabled(true);
+    try{
+      const r=await doFetch('/api/calificaciones/import_preview/',{method:'POST',body:fd});
+      if(!r.ok){ showErr('No se pudo validar el archivo.'); return; }
+      const data=await r.json();
+      rows=(data.rows||[]).map(x=>{
+        const out = {
+          rut: x.rut ?? x.RUT ?? '',
+          razon_social: x.razon_social ?? x['Razón social'] ?? '',
+          periodo: x.periodo ?? x.Período ?? '',
+          tipo: x.tipo ?? x.Tipo ?? x.tipo_instrumento ?? '',
+          folio: x.folio ?? x.Folio ?? '',
+          monto: String(x.monto ?? x.Monto ?? x.monto_raw ?? '').trim(),
+          moneda: (x.moneda ?? x.Moneda ?? '').toString().toUpperCase(),
+          estado: x.estado ?? x.Estado ?? x.estado_validacion ?? '',
+          observaciones: x.observaciones ?? x.Observaciones ?? '',
+          _errors: x.errors || []
+        };
+        out.tipo_instrumento = out.tipo;
+        out.monto_raw = out.monto;
+        out.monto = formatLiveByCurrency(out.monto, out.moneda);
+        out.monto_raw = out.monto;
+        return out;
+      });
+      paint();
+      if(data.errors?.length) showErr(data.errors.join(' | '));
+    }catch{ showErr('Error de red al validar archivo.'); }
+    finally{ setBusy(false); setButtonsDisabled(false); }
+  });
+
+  /* ====== Exportar: XLSX (POST filas actuales) con fallback a CSV ====== */
+  function exportCSVFallback(){
+    const rowsOut = [['RUT','Razón social','Período','Tipo','Folio','Monto','Moneda','Estado','Observaciones']];
+    rows.forEach(r=>{
+      rowsOut.push([r.rut,r.razon_social,r.periodo,r.tipo,r.folio,r.monto,r.moneda,r.estado,r.observaciones]);
+    });
+    const csv = rowsOut.map(r=>r.map(v=>{
+      const s=String(v??''); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
     }).join(',')).join('\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url; a.download='carga_masiva.csv';
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
+    const a=document.createElement('a'); a.href=url; a.download='carga_masiva.csv'; a.click(); URL.revokeObjectURL(url);
+  }
 
-  $('#cmv_push')?.addEventListener('click', async ()=>{
-    const rows=$$('#cmv_tbody tr');
-    if(!rows.length) return alert('No hay filas.');
-    const cur=getCur();
-    const allowDec=(cur==='USD'||cur==='PEN');
-    const parseForAPI=(v)=>{
-      const raw=String(v||'');
-      if(!allowDec){ const d=raw.replace(/[^\d]/g,''); return d?parseInt(d,10):0; }
-      const lastSep=Math.max(raw.lastIndexOf(','),raw.lastIndexOf('.'));
-      if(lastSep<0){ const d=raw.replace(/[^\d]/g,''); return d?parseInt(d,10):0; }
-      const L=raw.slice(0,lastSep).replace(/[^\d]/g,'');
-      const R=raw.slice(lastSep+1).replace(/[^\d]/g,'').slice(0,2);
-      const i=L?parseInt(L,10):0; const f=R?parseInt(R,10)/Math.pow(10,R.length):0;
-      return +(i+f).toFixed(2);
-    };
-    let ok=0, fail=0;
-    for(const tr of rows){
-      const val=(c)=> tr.querySelector(`[data-col="${c}"]`)?.value?.trim() || '';
-      const payload={
-        rut: val('rut'),
-        razon_social: val('razon_social'),
-        periodo: val('periodo'),
-        tipo_instrumento: val('tipo_instrumento'),
-        folio: val('folio'),
-        monto: parseForAPI(val('monto')),
-        moneda: cur,
-        estado_validacion: val('estado_validacion'),
-        observaciones: val('observaciones'),
+  async function exportXLSX(){
+    if(!rows.length){ showErr('No hay filas para exportar.'); return; }
+    hideErr(); setBusy(true);
+    try{
+      const payload = {
+        // MISMAS CABECERAS Y CAMPOS QUE EL EXCEL
+        rows: rows.map(r => ({
+          rut: r.rut,
+          "Razón social": r.razon_social,
+          periodo: r.periodo,
+          tipo: r.tipo,
+          folio: r.folio,
+          monto: r.monto,          // mantener como está en UI
+          moneda: r.moneda,
+          estado: r.estado,
+          observaciones: r.observaciones
+        }))
       };
-      try{
-        const res=await fetch('/api/calificaciones/',{
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
-        });
-        if(res.ok) ok++; else fail++;
-      }catch(e){ fail++; }
+      const r = await doFetch('/api/calificaciones/export_xlsx_from_rows/',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if(!r.ok){
+        // si el backend aún no está con POST habilitado, fallback a CSV
+        exportCSVFallback();
+        showErr('No se pudo exportar XLSX. Se exportó CSV como respaldo.');
+        return;
+      }
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      const u = URL.createObjectURL(blob);
+      a.href = u; a.download = 'carga_masiva.xlsx';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+    }catch(e){
+      exportCSVFallback();
+      showErr('Error al exportar XLSX. Se exportó CSV como respaldo.');
+    }finally{
+      setBusy(false);
     }
-    alert(`Envío completado. OK: ${ok} • Error: ${fail} • Moneda: ${cur}`);
+  }
+
+  document.getElementById('btn_export_xlsx').addEventListener('click', exportXLSX);
+
+  /* payloads para preview/commit */
+  function buildPayload(periodoForm /* 'as_is' | 'dash' | 'plain' */){
+    return {
+      rows: rows.map(r=>{
+        let periodo = r.periodo;
+        if(periodoForm==='dash'){
+          const m=String(r.periodo||'').match(/^(\d{4})(\d{2})$/);
+          if(m) periodo=`${m[1]}-${m[2]}`;
+        }
+        if(periodoForm==='plain'){
+          const m=String(r.periodo||'').match(/^(\d{4})-(\d{1,2})/);
+          if(m){ periodo=`${m[1]}${String(m[2]).padStart(2,'0')}`; }
+        }
+        return {
+          rut: r.rut,
+          razon_social: r.razon_social,
+          periodo,
+          tipo: r.tipo,
+          folio: r.folio,
+          monto: r.monto,
+          moneda: r.moneda,
+          estado: r.estado,
+          observaciones: r.observaciones,
+          tipo_instrumento: r.tipo,
+          monto_raw: r.monto,
+          estado_validacion: r.estado
+        };
+      })
+    };
+  }
+
+  async function postJSON(url,payload){
+    const r=await doFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const text=await r.text(); return {ok:r.ok,text};
+  }
+  function applyRowErrors(json){
+    (json.rows||[]).forEach((rr,i)=>{ rows[i]._errors=rr.errors||[]; });
+    $('#badge_errors').textContent=`${rows.reduce((a,b)=>a+(b._errors?.length||0),0)} errores`;
+    paint();
+  }
+  function looksPeriodo(t){
+    try{
+      const j=(typeof t==='string')?JSON.parse(t):t;
+      const s=((j?.errors)||[]).join(' ').toLowerCase()+' '+((j?.rows)||[]).map(x=>(x.errors||[]).join(' ')).join(' ').toLowerCase();
+      return /periodo|período|yyyy-?mm/.test(s);
+    }catch{
+      return /periodo|período|yyyy-?mm/i.test(String(t||''));
+    }
+  }
+
+  /* validar */
+  $('#btn_preview').addEventListener('click', async (ev)=>{
+    ev.preventDefault();
+    if(!rows.length){ showErr('No hay filas para validar.'); return; }
+    hideErr(); setBusy(true); $('#btn_preview').disabled=true; $('#btn_commit').disabled=true;
+    try{
+      let res = await postJSON('/api/calificaciones/import_preview/', buildPayload('as_is'));
+      if(!res.ok){ showErr(res.text.slice(0,800)); return; }
+      let data={}; try{ data=JSON.parse(res.text);}catch{ data={errors:['Respuesta no JSON']}; }
+      applyRowErrors(data);
+      if(looksPeriodo(data)){
+        let res2 = await postJSON('/api/calificaciones/import_preview/', buildPayload('plain'));
+        if(res2.ok){ let d2={}; try{ d2=JSON.parse(res2.text);}catch{} applyRowErrors(d2); if(d2.errors?.length) showErr(d2.errors.join(' | ')); }
+      }else if(data.errors?.length){ showErr(data.errors.join(' | ')); }
+    }finally{ setBusy(false); $('#btn_preview').disabled=false; $('#btn_commit').disabled=false; }
   });
 
+  /* commit */
+  $('#btn_commit').addEventListener('click', async (ev)=>{
+    ev.preventDefault();
+    if(!rows.length){ showErr('No hay filas para subir.'); return; }
+    if(rows.some(r=>r._errors?.length)){ showErr('Corrige los errores antes de subir.'); return; }
+    hideErr(); setBusy(true); $('#btn_preview').disabled=true; $('#btn_commit').disabled=true;
+    try{
+      let res = await postJSON('/api/calificaciones/import_commit/', buildPayload('as_is'));
+      if(!res.ok){
+        if(looksPeriodo(res.text)){
+          let res2 = await postJSON('/api/calificaciones/import_commit/', buildPayload('plain'));
+          if(!res2.ok){ showErr(res2.text.slice(0,800)); return; }
+          let d2={}; try{ d2=JSON.parse(res2.text);}catch{}
+          rows=[]; paint(); alert(`Subida exitosa. Creados: ${d2.created||0}`); return;
+        }
+        showErr(res.text.slice(0,800)); return;
+      }
+      let data={}; try{ data=JSON.parse(res.text);}catch{}
+      rows=[]; paint(); alert(`Subida exitosa. Creados: ${data.created||0}`);
+    }finally{ setBusy(false); $('#btn_preview').disabled=false; $('#btn_commit').disabled=false; }
+  });
+
+  paint();
 })();
-}catch(e){ console.error('[carga-masiva] fallo:', e); }
 </script>
 {% endblock %}

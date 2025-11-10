@@ -1,17 +1,17 @@
-# core/urls.py
-
 from django.contrib import admin
 from django.urls import path, include
-from django.views.generic.base import RedirectView # Necesario si usas la redirección
 
 urlpatterns = [
-    # 🚨 ASEGÚRATE DE QUE ESTA LÍNEA EXISTA O ESTÉ DESCOMENTADA:
-    # Esto incluye todas las rutas de web/urls.py, como login/ y register/.
-    path("", include("web.urls")), 
-    
-    # Redirigir la raíz (Opcional, si usas la solución de web/urls.py)
-    # path("", RedirectView.as_view(url="login/", permanent=True)),
-    
-    path("admin/", admin.site.urls),
+    # 1) URLs auxiliares (descarga de plantillas, etc.)
+    #    Usamos api.download_urls (existe en tu árbol) con rutas ya absolutas tipo "api/..."
+    path("", include("api.download_urls")),
+
+    # 2) Sitio web (renderiza templates; la comunicación con datos pasa por /api/...)
+    path("", include("web.urls")),
+
+    # 3) API principal (DRF)
     path("api/", include("api.urls")),
+
+    # 4) Admin opcional
+    path("dj-admin/", admin.site.urls),
 ]

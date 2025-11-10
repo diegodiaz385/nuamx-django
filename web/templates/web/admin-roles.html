@@ -1,246 +1,146 @@
 {% extends "web/_base.html" %}
+{% load static %}
 
 {% block html_title %}NUAMX – Usuarios / Roles{% endblock %}
 {% block page_title %}Usuarios / Roles{% endblock %}
 {% block page_subtitle %}
-<p class="muted">Control de accesos con perfiles y permisos (RBAC) vía API.</p>
+  <span id="rbac_badge" class="text-sm text-gray-500">Rol: …</span>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .input,.select{border:1px solid #e5e7eb;border-radius:10px;padding:10px;font:inherit}
-    .table-wrap{overflow:auto}
-    .muted{color:#6b7280}
-    .toast{position:fixed;right:16px;bottom:16px;background:#0A6A3B;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.12);font-weight:600}
-    .toast.warn{background:#92400e}
-    .toast.err{background:#991b1b}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:middle}
-    thead th{background:#f8fafc;font-weight:600}
+  .card-pad{ padding:.9rem .9rem; }
+  .muted{ color: var(--muted); }
+
+  .grid-top{
+    display:grid;
+    grid-template-columns: 1.2fr .9fr .9fr .9fr 1fr auto;
+    gap:.55rem; align-items:center;
+  }
+  .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:.55rem; margin-top:.55rem; }
+  @media (max-width:1100px){ .grid-top{ grid-template-columns:1fr 1fr; } .row-2{ grid-template-columns:1fr; } }
+
+  .ctl{ border:1px solid var(--border); border-radius:.6rem; min-height:44px; padding:.6rem .75rem; background:#fff; width:100%; }
+  .ctl-slim{ min-height:40px; padding:.48rem .65rem; }
+
+  .btn, .btn-ghost{
+    padding:.55rem .9rem; min-height:42px; border-radius:.62rem;
+    font-size:.9rem; line-height:1; cursor:pointer; user-select:none;
+    display:inline-flex; align-items:center; justify-content:center; gap:.35rem;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+  }
+  .btn-ghost{ border:1px solid var(--border); background:#fff; color:#0f172a; }
+  .btn-ghost:hover{ background:#f8fafc; }
+  .btn-sm{ min-height:36px; padding:.45rem .75rem; border-radius:.6rem; }
+  .btn-danger{ border-color:#ef4444; color:#b91c1c; background:#fff; }
+  .btn-danger:hover{ background:#fee2e2; }
+
+  .pw-wrap{ position:relative; }
+  .pw-toggle{
+    position:absolute; right:.55rem; top:50%; transform:translateY(-50%);
+    width:28px; height:28px; border:1px solid var(--border); border-radius:999px;
+    background:#fff; display:grid; place-items:center; cursor:pointer;
+  }
+  .pw-icon{ width:18px; height:18px; display:inline-block; background:currentColor;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 5c-7 0-10 7-10 7s3 7 10 7s10-7 10-7s-3-7-10-7m0 12a5 5 0 1 1 0-10a5 5 0 0 1 0 10'/%3E%3Ccircle cx='12' cy='12' r='2.5' fill='%23000'/%3E%3C/svg%3E") center/contain no-repeat; }
+  .pw-toggle[data-hide='1'] .pw-icon{
+    -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M2.1 3.5L3.5 2.1L21.9 20.5L20.5 21.9l-3-3A13 13 0 0 1 12 19C5 19 2 12 2 12a20 20 0 0 1 5-6.6zm6.2 6.2A4 4 0 0 0 8 12a4 4 0 0 0 4 4c.4 0 .8-.1 1.1-.2zM12 5c2.2 0 4.1.6 5.7 1.7c1.6 1 2.8 2.3 3.6 3.3c.4.6.7 1 .7 1s-.8 1.8-2.6 3.4l-1.4-1.4C19.1 12.9 20 12 20 12s-2.9-5-8-5'/%3E%3C/svg%3E");
+  }
+
+  .table-wrap{ border:1px solid var(--border); border-radius:.6rem; background:#fff; overflow:auto; }
+  table.wfull{ width:100%; border-collapse:collapse; table-layout:auto; font-size:.92rem; }
+  thead th{ background:#f8fafc; padding:.6rem .7rem; text-align:left; color:#64748b; font-weight:600; border-bottom:1px solid var(--border); }
+  tbody td{ border-bottom:1px solid #f0f2f4; padding:.55rem .7rem; vertical-align:middle; }
+  .pill{ display:inline-block; padding:.2rem .5rem; border:1px solid var(--border); border-radius:999px; background:#fff; font-size:.82rem; }
+
+  td.col-email{ white-space:nowrap; word-break:break-all; }
+  th.col-actions{ width:300px; }
+  th.col-actions-2{ width:140px; }
+  td .actions-group{ display:flex; gap:.5rem; align-items:center; flex-wrap:nowrap; }
+
+  .errbox{ margin-top:.5rem; border:1px solid #fecaca; background:#fee2e2; color:#991b1b; padding:.5rem .7rem; border-radius:.55rem; font-size:.9rem; }
+
+  .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(15,23,42,.35); z-index:50 }
+  .modal.show{ display:flex }
+  .modal-card{ width:100%; max-width:460px; background:#fff; border-radius:.8rem; border:1px solid var(--border); padding:1rem }
 </style>
 {% endblock %}
 
 {% block content %}
-<section class="card p-6 space-y-4">
-    <div class="row">
-        <input id="email" class="input" placeholder="Correo (ej: user@dominio.com)" style="min-width:280px">
-        <select id="role" class="select"></select>
-        <button class="btn" id="btn_add" type="button">➕ Asignar</button>
-        <button class="btn-ghost" id="btn_export" type="button">⬇ Exportar CSV</button>
+<section class="space-y-5">
+  <div id="create_card" class="card card-pad">
+    <div class="muted mb-2">Crea usuarios con rol, teléfono y contraseña. Luego edítalos desde la tabla.</div>
+    <div class="grid-top">
+      <input id="u_email" class="ctl" type="email" placeholder="Correo (ej: user@dominio.com)">
+      <input id="u_first" class="ctl" placeholder="Nombre">
+      <input id="u_last"  class="ctl" placeholder="Apellido">
+      <select id="u_role" class="ctl">
+        <option value="">Seleccionar rol</option>
+        <option>Administrador</option>
+        <option>Operador</option>
+        <option>Auditor</option>
+        <option>Usuario</option>
+      </select>
+      <input id="u_phone" class="ctl" placeholder="+569..." inputmode="tel">
+      <label class="flex items-center gap-2"><input id="u_active" type="checkbox" class="ctl-slim" checked><span class="muted">Activo</span></label>
     </div>
+    <div class="row-2">
+      <input id="u_username" class="ctl" placeholder="Usuario (opcional)">
+      <div class="pw-wrap">
+        <input id="u_password" class="ctl" type="password" placeholder="Contraseña">
+        <button id="pw_toggle" type="button" class="pw-toggle" aria-label="Mostrar/Ocultar contraseña"><span class="pw-icon"></span></button>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-3">
+      <button id="btn_create" class="btn" type="button">➕ Crear usuario</button>
+      <button id="btn_export" class="btn-ghost" type="button">⬇️ Exportar CSV</button>
+      <input id="u_search" class="ctl flex-1" placeholder="Buscar por email, nombre, rol o teléfono…">
+    </div>
+    <div id="err_create" class="errbox" style="display:none"></div>
+  </div>
 
+  <div class="card card-pad">
     <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Email</th><th>Rol</th><th>Creado</th><th>Actualizado</th><th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="tbody"></tbody>
-        </table>
+      <table class="wfull" id="users_table">
+        <thead>
+        <tr>
+          <th>Email</th><th>Nombre</th><th>Rol</th><th>Estado</th>
+          <th>Teléfono</th><th>Creado</th><th>Actualizado</th>
+          <th class="col-actions" colspan="2">Acciones</th>
+        </tr>
+        </thead>
+        <tbody id="users_tbody">
+          <tr><td colspan="9" class="muted">Cargando…</td></tr>
+        </tbody>
+      </table>
     </div>
+  </div>
 </section>
+
+<div id="pwd_modal" class="modal" aria-hidden="true">
+  <div class="modal-card">
+    <h3 style="font-size:1.05rem; font-weight:700; margin-bottom:.5rem">Cambiar contraseña</h3>
+    <p class="muted" style="margin-bottom:.6rem">Mínimo 8 caracteres.</p>
+    <div class="pw-wrap" style="margin-bottom:.8rem">
+      <input id="pwd_input" class="ctl" type="password" placeholder="Nueva contraseña">
+      <button id="pw_toggle_modal" class="pw-toggle" type="button" aria-label="Mostrar/Ocultar"><span class="pw-icon"></span></button>
+    </div>
+    <label id="pwd_require_wrap" class="flex items-center gap-2" style="margin-bottom:.6rem">
+      <input id="pwd_require" type="checkbox" class="ctl-slim">
+      <span>Requerir cambio al próximo inicio de sesión</span>
+    </label>
+    <div id="pwd_err" class="errbox" style="display:none"></div>
+    <div class="flex gap-2 justify-end">
+      <button id="pwd_cancel" class="btn-ghost">Cancelar</button>
+      <button id="pwd_save" class="btn">Guardar</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-(function(){
-    // Función de formato de fecha segura contra valores nulos
-    const fmt = v => v ? new Date(v).toLocaleString("es-CL") : "—"; // 🚨 Ajuste 3
-
-    // ====== Config - RUTAS CORREGIDAS ======
-    const API = {
-        roles: "{% url 'api_roles' %}",
-        users: "{% url 'api_users_list' %}",
-        assign: "{% url 'api_roles_assign' %}",
-    };
-
-    // Fallback silencioso si la API no devuelve roles
-    const DEFAULT_ROLES = [
-        { id: 1, name: "Administrador" },
-        { id: 2, name: "Analista" },
-        { id: 3, name: "Lectura" }
-    ];
-
-    // ====== Utils ======
-    const $ = sel => document.querySelector(sel);
-    
-    // 🚨 Ajuste 1: Leer CSRF desde la cookie (Estándar de Django) 🚨
-    const csrfToken = (() => {
-        const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-        return m ? decodeURIComponent(m[1]) : "";
-    })();
-
-    function toast(msg, kind){
-        const t = document.createElement('div');
-        t.className = 'toast' + (kind ? ' '+kind : '');
-        t.textContent = msg;
-        document.body.appendChild(t);
-        setTimeout(()=>{ t.remove(); }, 2000);
-    }
-
-    async function fetchJSON(url, opts){
-        const isUnsafe = opts && /^(POST|PUT|PATCH|DELETE)$/i.test(opts.method||'');
-        const headers = Object.assign(
-            {"Content-Type":"application/json"},
-            isUnsafe ? {"X-CSRFToken": csrfToken} : {}
-        );
-        const fetcher = window.authFetch || fetch; 
-        
-        const r = await fetcher(url, Object.assign({headers}, opts||{}));
-        if(!r.ok){
-            if(r.status === 204) return null;
-            let err = '';
-            try{ err = await r.text(); }catch(e){}
-            throw new Error(err || (r.status+' '+r.statusText));
-        }
-        const ct = r.headers.get('content-type') || '';
-        return ct.includes('application/json') ? r.json() : r.text();
-    }
-
-    // ====== Cargar roles (API -> fallback) ======
-    async function loadRoles(){
-        let roles = [];
-        try {
-            const data = await fetchJSON(API.roles);
-            roles = (Array.isArray(data) && data.length) ? data : DEFAULT_ROLES;
-        } catch (e) {
-            console.warn("Error cargando roles de API, usando fallback.", e);
-            roles = DEFAULT_ROLES;
-        }
-        window.__rolesCache = roles.map((r, i) => ({ id: r.id || i + 1, name: r.name || r.id }));
-
-        const sel = $("#role");
-        sel.innerHTML = '<option value="">Seleccionar rol</option>' +
-            window.__rolesCache.map(r=>`<option value="${r.id}">${r.name}</option>`).join("");
-    }
-
-    // ====== Render tabla usuarios ======
-    function renderUsers(rows){
-        const tb = $("#tbody");
-        if(!rows || !rows.length){
-            tb.innerHTML = `<tr><td colspan="5" class="muted">Sin usuarios. Agrega el primero arriba.</td></tr>`;
-            return;
-        }
-        tb.innerHTML = rows.map(u => {
-            const userRoleName = u.groups && u.groups.length ? u.groups[0].name : (u.role_name || 'Sin Rol');
-            const currentRole = window.__rolesCache.find(r => r.name === userRoleName) || {id: null};
-
-            return `
-                <tr data-id="${u.id}">
-                    <td>${u.email}</td>
-                    <td>
-                        <select class="select select-inline" data-edit-role="${u.id}">
-                            ${window.__rolesCache.map(r => `
-                                <option value="${r.id}" ${Number(currentRole.id)===Number(r.id)?'selected':''}>${r.name}</option>
-                            `).join('')}
-                        </select>
-                    </td>
-                    <td>${fmt(u.date_joined)}</td> 
-                    <td>${fmt(u.last_login)}</td> 
-                    <td>
-                        <button class="btn-ghost" data-del="${u.id}">Eliminar</button>
-                    </td>
-                </tr>
-            `;
-        }).join("");
-    }
-
-    // ====== Listar usuarios (GET) ======
-    async function loadUsers(){
-        try{
-            const users = await fetchJSON(API.users);
-            renderUsers(users);
-        }catch(e){
-            $("#tbody").innerHTML = `<tr><td colspan="5" class="muted">No se pudo conectar a la API de usuarios.</td></tr>`;
-        }
-    }
-
-    // ====== Crear usuario / Asignar Rol (POST) ======
-    async function addUser(){
-        const email = $("#email").value.trim();
-        const roleId = $("#role").value;
-        if(!email || !/\S+@\S+\.\S+/.test(email)) return toast("Correo inválido", "warn");
-        if(!roleId) return toast("Selecciona un rol", "warn");
-        
-        const roleName = window.__rolesCache.find(r => r.id == roleId)?.name;
-        
-        await fetchJSON(API.assign, { 
-            method:"POST", 
-            body: JSON.stringify({email: email, role: roleName})
-        }); 
-        
-        $("#email").value = ""; $("#role").value = "";
-        toast("Rol asignado (o usuario creado) correctamente", "ok");
-        await loadUsers();
-    }
-
-    // ====== Cambiar rol (POST / PATCH) ======
-    async function changeRole(userId, roleId){
-        const roleName = window.__rolesCache.find(r => r.id == roleId)?.name;
-        if (!roleName) return toast("Rol no encontrado", "err");
-        
-        // 🚨 Ajuste 2: Simplificación - fetchJSON ya lanza error si falla 🚨
-        await fetchJSON(API.assign, {
-            method:"POST", 
-            body: JSON.stringify({user_id: userId, role: roleName})
-        });
-        
-        toast("Rol actualizado", "ok");
-        await loadUsers();
-    }
-
-    // ====== Eliminar (DELETE) ======
-    async function deleteUser(userId){
-        const deleteUrl = API.users.replace(/\/$/, '') + '/' + userId + '/'; 
-        
-        await fetchJSON(deleteUrl, {method:"DELETE"});
-        toast("Usuario eliminado", "ok");
-        await loadUsers();
-    }
-
-    // ====== Exportar CSV (cliente) ======
-    async function exportCSV(){
-        const data = await fetchJSON(API.users).catch(()=>[]);
-        if(!data.length){ return toast("No hay usuarios", "warn"); }
-        const rows = [["email","rol","creado","actualizado"]];
-        data.forEach(u=>{
-            const rol = u.groups && u.groups.length ? u.groups[0].name : (u.role_name||"");
-            rows.push([u.email, rol, u.date_joined, u.last_login]);
-        });
-        const csv = rows.map(r=>r.map(v=>{
-            const s=String(v??""); return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
-        }).join(",")).join("\n");
-        const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "usuarios.csv";
-        document.body.appendChild(a); a.click(); a.remove();
-    }
-
-    // ====== Eventos ======
-    document.addEventListener("click", (e)=>{
-        const b = e.target.closest("button");
-        if(!b) return;
-        if(b.id==="btn_add"){ e.preventDefault(); addUser().catch(err=>toast("Error al asignar: "+err.message,"err")); }
-        if(b.id==="btn_export"){ e.preventDefault(); exportCSV().catch(err=>toast("Error al exportar: "+err.message,"err")); }
-        if(b.dataset.del){ e.preventDefault(); if(confirm("¿Eliminar usuario?")) deleteUser(b.dataset.del).catch(err=>toast("Error al eliminar: "+err.message,"err")); }
-    });
-
-    document.addEventListener("change", (e)=>{
-        const sel = e.target.closest('select[data-edit-role]');
-        if(!sel) return;
-        const id = sel.getAttribute('data-edit-role');
-        const roleId = sel.value;
-        changeRole(id, roleId).catch(err=>toast("Error al actualizar rol: "+err.message,"err"));
-    });
-
-    // ====== Init ======
-    (async function init(){
-        await loadRoles();
-        await loadUsers();
-    })();
-})();
+/* app.js v15 — Roles visibles, fechas formateadas, RBAC y modal de contraseña (opcional) */
+(function(){window.NUAMX_VERSION="v15";const $=(s,c=document)=>c.querySelector(s);const $$=(s,c=document)=>Array.from((c||document).querySelectorAll(s));const doFetch=(u,i)=>(window.authFetch?authFetch(u,i):fetch(u,i));function toast(m,t="info"){try{const d=document.createElement("div");d.textContent=m;d.className="fixed bottom-4 right-4 bg-white border border-gray-200 shadow-xl rounded-lg px-2.5 py-1.5 text-sm z-[9999]";if(t==="success")d.classList.add("ring-2","ring-green-200");if(t==="error")d.classList.add("ring-2","ring-red-200");document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}catch{console.log(m)}}function toCSV(r){return r.map(a=>a.map(v=>{const s=String(v??"");if(/[",\n]/.test(s))return `"${s.replace(/"/g,'""')}"`;return s}).join(",")).join("\n")}function downloadCSV(f,r){const c=toCSV(r);const b=new Blob([c],{type:"text/csv;charset=utf-8;"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=f;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u)}function fmtDate(v){if(!v)return"—";try{const d=(v instanceof Date)?v:new Date(String(v));if(isNaN(d.getTime()))return"—";return d.toLocaleDateString()+" "+d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}catch{return"—"}}const URLS=window.URLS||window.urls||{};const URL_ME=URLS.me||"/api/me/";const URL_LIST=URLS.users_list||$("#users_table")?.dataset?.urlList||"/api/users/";const URL_ROLE_ASSIGN=URLS.role_assign||"/api/roles/assign/";const URL_CREATE=URLS.register||"/api/auth/register/";const URL_DETAIL_ZERO=URLS.user_detail0||"/api/users/0/";const URL_PASS_ZERO=URLS.user_pass0||"/api/users/0/password/";const URL_ROLE_OF=URLS.role_of||null;const usersDetailUrl=id=>URL_DETAIL_ZERO.replace(/0\/?$/,String(id)+"/");const userPassUrl=id=>URL_PASS_ZERO?URL_PASS_ZERO.replace(/\/0(\/|$)/,`/${String(id)}$1`):null;let me={};let flags={myRole:"Operador",isAdmin:false,isOper:true,isAuditor:false,isUsuario:false};const norm=s=>String(s||"").toLowerCase();const looksAdmin=s=>/\b(superuser|admin|administrador|root)\b/.test(norm(s));const looksOper=s=>/\b(oper|operador|operator|staff|editor)\b/.test(norm(s));const looksAudit=s=>/\b(auditor|audit)\b/.test(norm(s));const looksUser=s=>/\b(usuario|user)\b/.test(norm(s));function computeRoleFromMe(m){if(m?.is_superuser===true||String(m?.is_superuser).toLowerCase()==="true")return"Administrador";if(m?.is_staff===true||String(m?.is_staff).toLowerCase()==="true")return"Operador";const p=[];["role","rol","role_name","role_display","tipo","profile_role"].forEach(k=>m?.[k]&&p.push(m[k]));if(Array.isArray(m?.groups))m.groups.forEach(g=>p.push(typeof g==="string"?g:(g?.name??"")));const b=p.filter(Boolean).join(" ");if(looksAdmin(b))return"Administrador";if(looksOper(b))return"Operador";if(looksAudit(b))return"Auditor";if(looksUser(b))return"Usuario";return"Operador"}function setFlags(r){flags={myRole:r,isAdmin:r==="Administrador",isOper:r==="Operador",isAuditor:r==="Auditor",isUsuario:r==="Usuario"};const badge=$("#rbac_badge");if(badge)badge.textContent=`Rol: ${r}`;const createCard=$("#create_card");if(createCard)createCard.style.display=flags.isAdmin?"":"none";let banner=document.getElementById("rbac_banner");if(!banner){banner=document.createElement("div");banner.id="rbac_banner";banner.className="text-sm text-gray-500 mt-1";const holder=document.querySelector('[id="rbac_badge"]')?.parentElement||document.body;holder.appendChild(banner)}const perms=[flags.isAdmin?"crear/editar/activar/desactivar/eliminar/clave/cambiar roles":null,(flags.isOper&&!flags.isAdmin)?"editar/activar/desactivar/clave (sin cambiar roles ni eliminar)":null,flags.isAuditor?"solo lectura (sin acciones)":null,flags.isUsuario?"acceso restringido (sin módulo Usuarios/Roles)":null].filter(Boolean).join(" · ");banner.textContent=perms?`Permisos: ${perms}`:""}async function resolveMe(){try{me=JSON.parse(localStorage.getItem("me")||"{}")||{}}catch{me={}}try{const r=await doFetch(URL_ME);if(r?.ok)me=Object.assign({},me,await r.json())}catch{}const role=computeRoleFromMe(me);try{localStorage.setItem("me",JSON.stringify(Object.assign({},me,{role})))}catch{}setFlags(role)}(function(){const pw=$("#u_password"),pwBtn=$("#pw_toggle");if(pw&&pwBtn){pwBtn.addEventListener("click",()=>{const hide=pwBtn.getAttribute("data-hide")==="1";pw.type=hide?"text":"password";if(hide)pwBtn.removeAttribute("data-hide");else pwBtn.setAttribute("data-hide","1")});pwBtn.setAttribute("data-hide","1")}})();const roleCache=new Map();function roleFromUser(u){if(u?.email&&roleCache.has(u.email))return roleCache.get(u.email);const r=(u?.roles&&u.roles[0])||u?.role||u?.rol||u?.role_name||null;if(u?.email&&r)roleCache.set(u.email,r);return r||"Usuario"}async function fetchRoleByEmail(email){if(!email)return null;if(roleCache.has(email))return roleCache.get(email);if(!URL_ROLE_OF)return null;try{const res=await doFetch(URL_ROLE_OF+(URL_ROLE_OF.includes("?")?"&":"?")+"email="+encodeURIComponent(email));if(!res.ok)return null;const d=await res.json();const r=d?.role||d?.rol||d?.role_name||null;if(r){roleCache.set(email,r);return r}return null}catch{return null}}async function hydrateOneRow(tr,id,email){try{const r=await doFetch(usersDetailUrl(id));if(r?.ok){const d=await r.json();const roleLocal=roleFromUser(d);const roleRemote=roleLocal||await fetchRoleByEmail(d.email||email);const roleFinal=roleRemote||roleLocal||"Usuario";tr.dataset.active=String(!!d.is_active);$(".col-email",tr).textContent=d.email||email||"—";$(".col-phone",tr).textContent=d.phone||d.telefono||"—";$(".col-created",tr).textContent=fmtDate(d.created_at||d.date_joined||d.created);$(".col-updated",tr).textContent=fmtDate(d.updated_at||d.modified||d.last_login||d.updated);$(".col-active",tr).innerHTML=`<span class="pill">${d.is_active?"Activo":"Inactivo"}</span>`;$(".col-role",tr).textContent=roleFinal;const tbtn=tr.querySelector('[data-act="toggle"]');if(tbtn)tbtn.textContent=d.is_active?"Desactivar":"Activar"}else{const r2=await fetchRoleByEmail(email);if(r2)$(".col-role",tr).textContent=r2}}catch{}}function renderRows(items){const TB=$("#users_tbody");if(!TB)return;if(!items||!items.length){TB.innerHTML=`<tr><td colspan="9" class="muted">Sin usuarios.</td></tr>`;return}TB.innerHTML="";items.forEach(u=>{const tr=document.createElement("tr");tr.dataset.id=u.id;tr.dataset.active=String(!!u.is_active);const nombre=`${u.first_name||""}${u.last_name?" "+u.last_name:""}`;const rolTxt=roleFromUser(u);const canEditBasics=(flags.isAdmin||flags.isOper);const canToggle=(flags.isAdmin||flags.isOper);const canDelete=flags.isAdmin;const canPassword=(flags.isAdmin||flags.isOper);tr.innerHTML=`<td class="break-anywhere col-email" title="${u.email||""}">${u.email||"—"}</td><td>${nombre||"—"}</td><td class="col-role">${rolTxt}</td><td class="col-active"><span class="pill">${u.is_active?"Activo":"Inactivo"}</span></td><td class="col-phone">${u.phone||u.telefono||"—"}</td><td class="col-created">${fmtDate(u.created_at||u.date_joined||u.created)}</td><td class="col-updated">${fmtDate(u.updated_at||u.modified||u.last_login||u.updated)}</td><td><div class="flex gap-2 actions-group"><button class="btn-ghost btn-sm" data-act="edit"   style="${canEditBasics?"":"display:none"}">Editar</button><button class="btn-ghost btn-sm" data-act="toggle" style="${canToggle?"":"display:none"}">${u.is_active?"Desactivar":"Activar"}</button><button class="btn-ghost btn-sm" data-act="passwd" style="${canPassword?"":"display:none"}">Clave</button><button class="btn-ghost btn-sm" data-act="save"   style="display:none">Guardar</button><button class="btn-ghost btn-sm" data-act="cancel" style="display:none">Cancelar</button><button class="btn-ghost btn-sm btn-danger" data-act="delete" style="${canDelete?"":"display:none"}">Eliminar</button></div></td>`;TB.appendChild(tr);hydrateOneRow(tr,u.id,u.email)})}async function loadUsers(){try{const res=await doFetch(URL_LIST);if(!res.ok)throw new Error("No se pudo conectar a la API de usuarios.");const d=await res.json();const arr=Array.isArray(d)?d:(d.results||[]);renderRows(arr)}catch(e){const TB=$("#users_tbody");if(TB)TB.innerHTML=`<tr><td colspan="9" class="muted">No se pudo conectar a la API de usuarios.</td></tr>`}}const errBox=$("#err_create");const showErr=m=>{if(!errBox)return;errBox.textContent=m||"Error desconocido";errBox.style.display=""};const hideErr=()=>{if(!errBox)return;errBox.style.display="none"};$("#btn_create")?.addEventListener("click",async()=>{if(!flags.isAdmin)return;hideErr();const payload={email:$("#u_email")?.value.trim(),first_name:$("#u_first")?.value.trim(),last_name:$("#u_last")?.value.trim(),username:$("#u_username")?.value.trim()||undefined,phone:$("#u_phone")?.value.trim(),password:$("#u_password")?.value,is_active:$("#u_active")?.checked?true:false};const roleName=$("#u_role")?.value.trim();if(!payload.email||!payload.password){showErr("Email y contraseña son obligatorios.");return}try{let r=await doFetch(URL_CREATE,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});if(!r.ok)throw new Error(await r.text());if(roleName){await doFetch(URL_ROLE_ASSIGN,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:payload.email,role:roleName})});roleCache.set(payload.email,roleName)}["u_email","u_first","u_last","u_username","u_phone","u_password"].forEach(id=>{const el=$("#"+id);if(el)el.value=""});if($("#u_role"))$("#u_role").value="";if($("#u_active"))$("#u_active").checked=true;await loadUsers();toast("Usuario creado.","success")}catch(e){showErr("No se pudo crear: "+e.message)}});$("#users_tbody")?.addEventListener("click",async(e)=>{const btn=e.target.closest("[data-act]");if(!btn)return;const act=btn.getAttribute("data-act");const tr=btn.closest("tr");const id=tr?.dataset?.id;if(act==="edit"){if(!(flags.isAdmin||flags.isOper))return;const cells=tr.querySelectorAll("td");const email=cells[0].textContent.trim();const nombre=cells[1].textContent.trim();const rol=cells[2].textContent.trim();const tel=cells[4].textContent.trim();const[first,...rest]=nombre.split(" ");const last=rest.join(" ");cells[0].innerHTML=`<input class="ctl ctl-slim" value="${email}">`;cells[1].innerHTML=`<div class="flex gap-2"><input class="ctl ctl-slim" placeholder="Nombre" style="min-width:120px" value="${first||""}"><input class="ctl ctl-slim" placeholder="Apellido" style="min-width:120px" value="${last||""}"></div>`;if(flags.isAdmin){cells[2].innerHTML=`<select class="ctl ctl-slim"><option ${rol==="Administrador"?"selected":""}>Administrador</option><option ${rol==="Operador"?"selected":""}>Operador</option><option ${rol==="Auditor"?"selected":""}>Auditor</option><option ${rol==="Usuario"?"selected":""}>Usuario</option></select>`}else{cells[2].innerHTML=`<input class="ctl ctl-slim" value="${rol}" readonly>`}const isAct=tr.dataset.active==="true";cells[3].innerHTML=`<label class="flex items-center gap-2"><input type="checkbox" ${isAct?"checked":""}><span class="muted">Activo</span></label>`;cells[4].innerHTML=`<input class="ctl ctl-slim" value="${tel!=="—"?tel:""}" placeholder="+569...">`;tr.querySelector('[data-act="edit"]').style.display="none";tr.querySelector('[data-act="toggle"]').style.display="none";tr.querySelector('[data-act="passwd"]').style.display="none";tr.querySelector('[data-act="save"]').style.display="";tr.querySelector('[data-act="cancel"]').style.display="";return}if(act==="cancel"){await loadUsers();return}if(act==="save"){if(!(flags.isAdmin||flags.isOper))return;const cells=tr.querySelectorAll("td");const newEmail=cells[0].querySelector("input").value.trim();const inputsName=cells[1].querySelectorAll("input");const newFirst=inputsName[0].value.trim();const newLast=(inputsName[1]?.value||"").trim();const roleEl=cells[2].querySelector("select");const newRole=roleEl?roleEl.value.trim():cells[2].querySelector("input").value.trim();const newActive=cells[3].querySelector("input[type=checkbox]").checked;const newPhone=cells[4].querySelector("input").value.trim();const editedIsMe=(String(me?.email||"").toLowerCase()===newEmail.toLowerCase());const oldRoleTxt=$(".col-role",tr)?.textContent?.trim()||"";try{const r=await doFetch(usersDetailUrl(id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:newEmail,first_name:newFirst,last_name:newLast,phone:newPhone,is_active:newActive})});if(!r.ok)throw new Error(await r.text());if(flags.isAdmin){const rr=await doFetch(URL_ROLE_ASSIGN,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:newEmail,role:newRole})});if(rr.ok)roleCache.set(newEmail,newRole)}$(".col-role",tr).textContent=newRole;tr.dataset.active=String(newActive);$(".col-active",tr).innerHTML=`<span class="pill">${newActive?"Activo":"Inactivo"}</span>`;const tbtn=tr.querySelector('[data-act="toggle"]');if(tbtn)tbtn.textContent=newActive?"Desactivar":"Activar";await hydrateOneRow(tr,id,newEmail);toast("Cambios guardados.","success");if(editedIsMe&&roleEl&&newRole!==oldRoleTxt){setTimeout(()=>alert("Tu rol fue actualizado. Cierra sesión y vuelve a entrar para aplicar los nuevos permisos."),80)}}catch(err){alert("No se pudo guardar: "+err.message)}return}if(act==="toggle"){if(!(flags.isAdmin||flags.isOper))return;const wasActive=tr.dataset.active==="true";try{const r=await doFetch(usersDetailUrl(id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({is_active:!wasActive})});if(!r.ok)throw new Error(await r.text());await hydrateOneRow(tr,id,$(".col-email",tr)?.textContent?.trim());toast(!wasActive?"Usuario activado.":"Usuario desactivado.","success")}catch(err){alert("No se pudo cambiar el estado: "+err.message)}return}if(act==="delete"){if(!flags.isAdmin)return;if(!confirm("¿Eliminar definitivamente este usuario?"))return;try{const r=await doFetch(usersDetailUrl(id),{method:"DELETE"});if(r.status!==204)throw new Error(await r.text());await loadUsers();toast("Usuario eliminado.","success")}catch(err){alert("No se pudo eliminar: "+err.message)}return}if(act==="passwd"){if(!(flags.isAdmin||flags.isOper))return;const modal=$("#pwd_modal");const pwdInput=$("#pwd_input");const pwdErr=$("#pwd_err");const pwdRequire=$("#pwd_require");const pwdRequireWrap=$("#pwd_require_wrap");const passURL=userPassUrl(id);if(modal&&pwdInput&&passURL){pwdInput.value="";if(pwdErr)pwdErr.style.display="none";if(pwdRequireWrap)pwdRequireWrap.style.display=flags.isAdmin?"":"none";if(pwdRequire){pwdRequire.disabled=!flags.isAdmin;pwdRequire.checked=!!flags.isAdmin}modal.classList.add("show");modal.setAttribute("aria-hidden","false");setTimeout(()=>pwdInput.focus(),50);if(!modal.__wired){const close=()=>{modal.classList.remove("show");modal.setAttribute("aria-hidden","true")};$("#pwd_cancel")?.addEventListener("click",ev=>{ev.preventDefault();close()});modal.addEventListener("click",ev=>{if(ev.target===modal)close()});$("#pwd_save")?.addEventListener("click",async ev=>{ev.preventDefault();const pwd=(pwdInput.value||"").trim();const force=flags.isAdmin?!!(pwdRequire&&pwdRequire.checked):false;if(pwd.length<8){if(pwdErr){pwdErr.textContent="La contraseña debe tener al menos 8 caracteres.";pwdErr.style.display=""}return}try{const r=await doFetch(passURL,{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd,force_change:force})});if(!r.ok){const t=await r.text().catch(()=>"(sin cuerpo)");if(pwdErr){pwdErr.textContent=`Error: ${t}`;pwdErr.style.display=""}return}close();toast("Contraseña actualizada"+(force?" (se pedirá cambio al próximo inicio).":"."),"success")}catch{if(pwdErr){pwdErr.textContent="No se pudo actualizar la contraseña.";pwdErr.style.display=""}}});modal.__wired=true}}else{const newPwd=prompt("Nueva contraseña (min 8 caracteres):");if(!newPwd)return;if(newPwd.length<8){alert("Debe tener al menos 8 caracteres.");return}if(!passURL){alert("Endpoint de password no configurado (URLS.user_pass0).");return}try{const r=await doFetch(passURL,{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify({password:newPwd,force_change:flags.isAdmin?true:false})});if(!r.ok)throw new Error(await r.text());toast("Contraseña actualizada.","success")}catch(err){alert("No se pudo actualizar la contraseña: "+err.message)}}return}});$("#u_search")?.addEventListener("input",()=>{const q=$("#u_search").value.toLowerCase();$$("#users_tbody tr").forEach(tr=>{const txt=tr.textContent.toLowerCase();tr.style.display=txt.includes(q)?"":"none"})});$("#btn_export")?.addEventListener("click",()=>{const rows=[["Email","Nombre","Rol","Estado","Creado","Actualizado","Teléfono"]];$$("#users_tbody tr").forEach(tr=>{const tds=tr.querySelectorAll("td");if(!tds.length)return;rows.push([tds[0].innerText.trim(),tds[1].innerText.trim(),tds[2].innerText.trim(),tds[3].innerText.trim(),tds[5].innerText.trim(),tds[6].innerText.trim(),tds[4].innerText.trim()])});downloadCSV("usuarios.csv",rows)});(async function(){try{await resolveMe()}catch{setFlags("Operador")}if($("#users_tbody"))await loadUsers();document.dispatchEvent(new CustomEvent("nuamx:rbac-ready",{detail:flags}))})()})();
 </script>
 {% endblock %}
