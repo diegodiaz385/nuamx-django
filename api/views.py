@@ -55,8 +55,15 @@ try:
 except Exception:
     finders = None  # fallback
 
+# ⬇️ NUEVO: requests opcional para “traer de todos lados”
+try:
+    import requests  # type: ignore
+except Exception:  # pragma: no cover
+    requests = None  # si no está instalado, seguimos solo con fuentes locales
+
 User = get_user_model()
 ROLES_VALIDOS = {"Administrador", "Operador", "Auditor", "Usuario"}
+
 
 # ========================= Helpers FX =========================
 def fx_to_clp(amount_number: float, code: str) -> int:
@@ -77,16 +84,102 @@ def fx_to_clp(amount_number: float, code: str) -> int:
         except Exception:
             return 0
 
-# ========================= Utilidades de roles/flags =========================
+
+# ========================= Utilidades varias =========================
 def _ensure_role_exists(name: str):
     if name not in ROLES_VALIDOS:
         pass
     grp, _ = User.groups.rel.model.objects.get_or_create(name=name)  # Group
     return grp
 
+
 def _get_flags(user: User) -> UserFlag:
     obj, _ = UserFlag.objects.get_or_create(user=user)
     return obj
+
+
+def _truthy(val) -> bool:
+    """Interpreta strings como 1/true/on/sí/si."""
+    s = str(val or "").strip().lower()
+    return s in ("1", "true", "on", "sí", "si", "yes", "y")
+
+
+# ================ Resolución de razón social (“de todos lados”) ================
+def _resolve_razon_from_local_cache(rut: str) -> tuple[str | None, str]:
+    """
+    Busca en la misma tabla Calificacion algún registro previo con misma RUT
+    y razón_social no vacía. Toma el más reciente.
+    """
+    c = (
+        Calificacion.objects.filter(rut__iexact=rut)
+        .exclude(Q(razon_social__isnull=True) | Q(razon_social=""))
+        .order_by("-id")
+        .first()
+    )
+    if c and c.razon_social:
+        return c.razon_social.strip(), "local:calificacion"
+    return None, "local:none"
+
+
+def _resolve_razon_from_http(rut: str) -> tuple[str | None, str, str | None]:
+    """
+    Consulta servicios HTTP configurados por env:
+      RESOLVE_RAZON_HTTP="https://a.example/lookup,https://b.example/find"
+    Acepta JSON {"razon_social": "..."} o texto plano.
+    Devuelve (razon, source, error).
+    """
+    if not requests:
+        return None, "http:disabled", "requests-not-installed"
+
+    urls = (os.environ.get("RESOLVE_RAZON_HTTP") or "").strip()
+    if not urls:
+        return None, "http:none", None
+
+    for raw in urls.split(","):
+        url = raw.strip()
+        if not url:
+            continue
+        try:
+            resp = requests.get(url, params={"rut": rut}, timeout=6)
+            if resp.status_code != 200:
+                continue
+            razon = None
+            try:
+                data = resp.json()
+                razon = (data.get("razon_social") or "").strip() or None
+            except Exception:
+                txt = (resp.text or "").strip()
+                razon = txt or None
+            if razon:
+                return razon, f"http:{url}", None
+        except Exception as e:  # pragma: no cover
+            _ = e
+            continue
+    return None, "http:none", None
+
+
+def resolve_razon_social(rut: str) -> tuple[str | None, str, str | None]:
+    """
+    Intenta resolver razón social en este orden:
+      1) Cache local (Calificacion misma tabla)
+      2) Servicios HTTP configurables por env
+    Retorna (razon, source, error)
+    """
+    if not rut:
+        return None, "invalid:empty-rut", "empty-rut"
+
+    # 1) local
+    razon, src = _resolve_razon_from_local_cache(rut)
+    if razon:
+        return razon, src, None
+
+    # 2) http externos opcionales
+    razon, src, err = _resolve_razon_from_http(rut)
+    if razon:
+        return razon, src, None
+
+    return None, "not-found", err
+
 
 # ========================= Auth y Perfil =========================
 class EmailOrUsernameTokenView(APIView):
@@ -127,6 +220,7 @@ class EmailOrUsernameTokenView(APIView):
             status=200,
         )
 
+
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def me_view(request):
@@ -134,15 +228,19 @@ def me_view(request):
     data["must_change_password"] = bool(_get_flags(request.user).must_change_password)
     return Response(data)
 
+
 class RegisterView(CreateAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = RegisterSerializer
 
+
 class UsersListView(ListAPIView):
     permission_classes = [permissions.IsAuthenticated, CanListUsers]
     serializer_class = UserSerializer
+
     def get_queryset(self):
         return User.objects.all().order_by("id")
+
 
 class UsersDetailView(RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
@@ -197,8 +295,10 @@ class UsersDetailView(RetrieveUpdateDestroyAPIView):
             return Response({"detail": "No autorizado."}, status=403)
         return super().destroy(request, *args, **kwargs)
 
+
 class AssignRoleView(APIView):
     permission_classes = [permissions.IsAuthenticated, CanAssignRoles]
+
     def post(self, request):
         email = (request.data.get("email") or "").strip()
         role = (request.data.get("role") or "").strip()
@@ -216,8 +316,10 @@ class AssignRoleView(APIView):
 
         return Response({"ok": True, "email": user.email, "role": grp.name}, status=200)
 
+
 class UserPasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated, CanResetPassword]
+
     def post(self, request, pk):
         from django.contrib.auth.password_validation import validate_password
         from django.core.exceptions import ValidationError as DjangoValidationError
@@ -255,8 +357,10 @@ class UserPasswordView(APIView):
 
         return Response({"ok": True, "must_change_password": flags.must_change_password}, status=200)
 
+
 class MePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request):
         from django.contrib.auth.password_validation import validate_password
         from django.core.exceptions import ValidationError as DjangoValidationError
@@ -300,6 +404,7 @@ class MePasswordView(APIView):
         flags.save()
 
         return Response({"ok": True}, status=200)
+
 
 # ========================= Calificaciones (CRUD + export CSV/XLSX) =========================
 class CalificacionViewSet(viewsets.ModelViewSet):
@@ -352,17 +457,177 @@ class CalificacionViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    # ==================== NUEVO: Enriquecer en el listado ====================
+    def list(self, request, *args, **kwargs):
+        """
+        Si pides ?no_inscritos=1 (o ?enrich=1), se intenta completar razon_social
+        desde:
+          1) cache local de Calificacion
+          2) servicios HTTP en RESOLVE_RAZON_HTTP
+        No persiste en BD; solo afecta la representación JSON.
+        Flags:
+          - enrich=1/0 (forzar encendido/apagado)
+          - auto_enrich_noi=1/0 (por defecto 1) activa auto-enriquecimiento cuando no_inscritos=1
+        """
+        qp = request.query_params
+        want_noi = _truthy(qp.get("no_inscritos") or qp.get("noi"))
+        enrich_flag = qp.get("enrich")
+        auto_enrich_noi = qp.get("auto_enrich_noi")
+
+        # política: por defecto, si piden no_inscritos, enriquecemos
+        auto_enrich = True if auto_enrich_noi is None else _truthy(auto_enrich_noi)
+        enrich = (_truthy(enrich_flag) if enrich_flag is not None else (want_noi and auto_enrich))
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        if not enrich:
+            # sin cambios: comportamiento 100% original
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        # Enriquecimiento: resolvemos por RUT y en memoria seteamos razon_social
+        # para que el serializer lo devuelva completado.
+        # 1) construir cache por RUT
+        need = []
+        for obj in queryset:
+            if not (obj.razon_social or "").strip():
+                if (obj.rut or "").strip():
+                    need.append((obj.id, obj.rut.strip()))
+
+        # Agrupar por RUT único
+        unique_ruts = sorted({rut for _, rut in need})
+
+        resolved_cache: dict[str, str] = {}
+        for rut in unique_ruts:
+            razon, _, _ = resolve_razon_social(rut)
+            if razon:
+                resolved_cache[rut] = razon
+
+        # 2) aplicar sobre instancias (sin guardar)
+        for obj in queryset:
+            if not (obj.razon_social or "").strip():
+                rut = (obj.rut or "").strip()
+                if rut and rut in resolved_cache:
+                    # Asignación en memoria para que el serializer lea este valor
+                    obj.razon_social = resolved_cache[rut]
+
+        # Continuar flujo DRF normal
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            # Cabecera informativa (opcional)
+            resp = self.get_paginated_response(serializer.data)
+            try:
+                resp["X-Resolved-RUTs"] = str(len(resolved_cache))
+            except Exception:
+                pass
+            return resp
+
+        serializer = self.get_serializer(queryset, many=True)
+        resp = Response(serializer.data)
+        try:
+            resp["X-Resolved-RUTs"] = str(len(resolved_cache))
+        except Exception:
+            pass
+        return resp
+
+    # ==================== NUEVO: Resolver "no inscritos" ====================
+    @action(detail=False, methods=["post"], url_path="resolve_no_inscritos", permission_classes=[permissions.IsAuthenticated])
+    def resolve_no_inscritos(self, request, *args, **kwargs):
+        """
+        Intenta completar razon_social para calificaciones con RUT y razon_social vacía.
+        Opciones:
+          - dry_run: 1 (default) => no guarda; 0 => guarda cambios
+          - limit: máximo de filas a procesar (default 500)
+          - overwrite: 1 para sobreescribir si existe (default 0 = solo vacíos)
+          - filtros iguales a get_queryset (rut, pdesde, phasta, tipo, estado, moneda, no_inscritos)
+        Fuentes:
+          1) Local (otras calificaciones con mismo RUT y razon_social conocida)
+          2) HTTP externos (RESOLVE_RAZON_HTTP)
+        """
+        qp = request.query_params
+        dry_run = _truthy(qp.get("dry_run")) if qp.get("dry_run") is not None else True
+        limit = int(qp.get("limit") or 500)
+        overwrite = _truthy(qp.get("overwrite") or "0")
+
+        # Tomamos el queryset respetando filtros y forzando no inscritos por defecto
+        base_qs = self.get_queryset()
+        if not _truthy(qp.get("no_inscritos") or qp.get("noi") or "1"):
+            # si no pidieron explicitamente no_inscritos, igualmente trabajamos sobre vacíos para este endpoint
+            base_qs = base_qs.filter(Q(razon_social__isnull=True) | Q(razon_social=""))
+
+        # Solo columnas necesarias
+        qs = base_qs.order_by("id").values("id", "rut", "razon_social")
+        rows = list(qs[:limit])
+
+        # Agrupamos por RUT
+        by_rut = {}
+        for r in rows:
+            rut = (r.get("rut") or "").strip()
+            if not rut:
+                continue
+            by_rut.setdefault(rut, []).append(r["id"])
+
+        updated = 0
+        examples = []
+        errors = []
+
+        for rut, ids in by_rut.items():
+            razon, source, err = resolve_razon_social(rut)
+            if err:
+                errors.append({"rut": rut, "error": err, "source": source})
+            if not razon:
+                continue
+
+            examples.append({"rut": rut, "razon_social": razon, "source": source, "affected": len(ids)})
+
+            if dry_run:
+                continue
+
+            # Guardar en BD: por defecto solo vacíos, a menos que overwrite=1
+            if overwrite:
+                q = Calificacion.objects.filter(id__in=ids)
+            else:
+                q = Calificacion.objects.filter(id__in=ids).filter(Q(razon_social__isnull=True) | Q(razon_social=""))
+            count = q.update(razon_social=razon)
+            updated += int(count)
+
+        return Response(
+            {
+                "ok": True,
+                "dry_run": bool(dry_run),
+                "distinct_ruts": len(by_rut),
+                "processed": len(rows),
+                "updated": int(updated),
+                "examples": examples[:20],  # muestra algunos
+                "errors": errors[:20],
+            },
+            status=200,
+        )
+
     @action(detail=False, methods=["get"], url_path="export_csv")
     def export_csv(self, request, *args, **kwargs):
+        # ⬇️ NUEVO: permitir enrich=1 para completar razon_social en la descarga (sin guardar en BD)
+        enrich = _truthy(request.query_params.get("enrich"))
         qs = self.filter_queryset(self.get_queryset()).order_by("id")
+
         rows = [[
             "rut", "razon_social", "periodo", "tipo_instrumento", "folio",
             "monto", "moneda", "estado_validacion", "observaciones", "created_at"
         ]]
         for c in qs:
+            razon = c.razon_social
+            if enrich and not (razon or "").strip():
+                resolved, _, _ = resolve_razon_social(c.rut)
+                if resolved:
+                    razon = resolved
             rows.append([
                 c.rut,
-                c.razon_social,
+                razon,
                 c.periodo,
                 c.tipo_instrumento,
                 c.folio,
@@ -615,6 +880,7 @@ class CalificacionViewSet(viewsets.ModelViewSet):
         }
         return Response(data, status=200)
 
+
 # ========================= Carga masiva: plantilla/preview/commit =========================
 class CalificacionTemplateView(APIView):
     """
@@ -751,6 +1017,7 @@ class CalificacionTemplateView(APIView):
         )
         resp["Content-Disposition"] = 'attachment; filename="plantilla_carga_masiva.xlsx"'
         return resp
+
 
 class CalificacionBulkPreviewView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -923,6 +1190,7 @@ class CalificacionBulkPreviewView(APIView):
 
         return Response({"currency": summary_currency, "rows": out_rows, "errors": []}, status=200)
 
+
 class CalificacionBulkCommitView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -981,6 +1249,7 @@ class CalificacionBulkCommitView(APIView):
 
         return Response({"ok": True, "created": created, "ids": ids}, status=200)
 
+
 # ========================= Reportes (descarga XLSX/CSV con formato bonito) =========================
 class ReporteExportView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1028,6 +1297,7 @@ class ReporteExportView(APIView):
     def get(self, request):
         scope = (request.query_params.get("scope") or "mensual").lower()
         fmt   = (request.query_params.get("format") or "xlsx").lower()
+        enrich = _truthy(request.query_params.get("enrich"))  # ⬅️ NUEVO
         if scope not in ("diario", "semanal", "mensual"):
             return Response({"detail": "scope inválido"}, status=400)
 
@@ -1042,9 +1312,14 @@ class ReporteExportView(APIView):
         data = []
         tz = timezone.get_current_timezone()
         for c in qs:
+            razon = c.razon_social
+            if enrich and not (razon or "").strip():
+                resolved, _, _ = resolve_razon_social(c.rut)
+                if resolved:
+                    razon = resolved
             data.append([
                 c.rut,
-                c.razon_social,
+                razon,
                 c.periodo,
                 c.tipo_instrumento,
                 c.folio,

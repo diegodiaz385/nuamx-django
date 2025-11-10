@@ -5,7 +5,7 @@ Django settings for core project – listo para NUAMX (Plantillas + DRF + SQLite
 - Templates en web/templates/
 - Estáticos en web/static/
 - Base de datos: SQLite por defecto (simple y sin credenciales).
-- DRF con JWT (SimpleJWT) listo.
+- DRF con JWT (SimpleJWT) y SessionAuthentication (para cookie de sesión) listo.
 """
 
 from pathlib import Path
@@ -23,6 +23,18 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 DEBUG = os.getenv("DEBUG", "True").strip().lower() == "true"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
+
+# (Opcional) Orígenes de confianza para CSRF (útil si accedes por http://127.0.0.1:8000 o dominios externos)
+# Puedes definir en .env: CSRF_TRUSTED="http://127.0.0.1:8000,http://localhost:8000"
+_csrf_trusted = [x.strip() for x in os.getenv("CSRF_TRUSTED", "").split(",") if x.strip()]
+if _csrf_trusted:
+    CSRF_TRUSTED_ORIGINS = _csrf_trusted
+
+# Cookies seguras en prod (no rompe en dev)
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 # Apps instaladas
 INSTALLED_APPS = [
@@ -111,11 +123,14 @@ STATICFILES_FINDERS = [
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# DRF + JWT listo para usar con SimpleJWT
+# DRF + JWT + SessionAuthentication (para permitir cookie de sesión en vistas protegidas)
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",  # ⬅️ añadido
     ),
+    # No fijamos DEFAULT_PERMISSION_CLASSES globales para no romper vistas públicas;
+    # cada View/ViewSet define sus permisos.
 }
 
 SIMPLE_JWT = {

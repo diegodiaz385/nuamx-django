@@ -1,11 +1,11 @@
-/* app.js v16 — Núcleo compartido: authFetch + Bus de eventos + sesión/rol + utilidades
+/* app.js v16.1 — Núcleo compartido: authFetch + Bus de eventos + sesión/rol + utilidades
    - Unifica llamadas a API con refresh automático de JWT.
    - Publica eventos entre módulos/pestañas: users:changed, calificaciones:changed, reportes:generated, session:changed, etc.
    - Recarga suave por defecto si no hay listeners de página.
    - Mantiene helpers y UI toasts existentes de v15.
 */
 (function () {
-  window.NUAMX_VERSION = "v16";
+  window.NUAMX_VERSION = "v16.1";
 
   // =========================
   // Utilidades básicas (UI)
@@ -29,12 +29,10 @@
     try{
       const d = (v instanceof Date) ? v : new Date(String(v));
       if (isNaN(d.getTime())) return String(v);
-      // Formato ISO para evitar TZ raras en lista; vistas específicas pueden re-formatear
       return d.toISOString();
     }catch{ return "—"; }
   }
 
-  // CSV helpers usados por Admin/Roles
   function toCSV(rows){
     return rows.map(r => r.map(v => {
       const s = String(v ?? "");
@@ -50,7 +48,6 @@
     URL.revokeObjectURL(url);
   }
 
-  // Exponer utilidades que otras páginas ya estaban usando implícitamente
   window.NUAMX = window.NUAMX || {};
   Object.assign(window.NUAMX, { fmtDate, toast, downloadCSV });
 
@@ -58,40 +55,27 @@
   // Bus de eventos compartido
   // =========================
   const BUS_CH = "nuamx.bus.v1";
-
-  const bc = (function(){
-    try { return new BroadcastChannel(BUS_CH); } catch { return null; }
-  })();
-
-  const listeners = new Map(); // topic -> Set<fn>
+  const bc = (function(){ try { return new BroadcastChannel(BUS_CH); } catch { return null; } })();
+  const listeners = new Map();
 
   function publish(topic, payload){
     const msg = { topic, payload, ts: Date.now(), source: "web" };
-    // Local (misma pestaña)
     (listeners.get(topic) || new Set()).forEach(fn => { try{ fn(payload); }catch{} });
-    // CustomEvent para scripts inline
     document.dispatchEvent(new CustomEvent("nuamx:"+topic, { detail: payload }));
-    // BroadcastChannel (entre pestañas)
     if (bc) try{ bc.postMessage(msg); }catch{}
-    // Fallback con localStorage
     try { localStorage.setItem("__nuamx_bus__", JSON.stringify(msg)); localStorage.removeItem("__nuamx_bus__"); }catch{}
   }
-
   function subscribe(topic, fn){
     if (!listeners.has(topic)) listeners.set(topic, new Set());
     listeners.get(topic).add(fn);
     return () => listeners.get(topic)?.delete(fn);
   }
-
-  // Entradas remotas
   if (bc) bc.onmessage = (ev)=>{ const {topic, payload} = ev.data || {}; if (topic) publish(topic, payload); };
   window.addEventListener("storage", (e)=>{
     if (e.key === "__nuamx_bus__" && e.newValue){
       try{ const {topic, payload} = JSON.parse(e.newValue)||{}; if(topic) publish(topic, payload); }catch{}
     }
   });
-
-  // Exponer el bus
   window.NUAMX.bus = { publish, subscribe };
 
   // =========================
@@ -99,7 +83,6 @@
   // =========================
   const TOKEN_KEYS   = ["nuamx_token","access","access_token","jwt","token"];
   const REFRESH_KEYS = ["nuamx_refresh","refresh","refresh_token","token_refresh"];
-
   const looksLikeJWT = s => (typeof s === "string" && s.split(".").length === 3);
 
   function readCookie(name) {
@@ -108,7 +91,6 @@
       return m ? decodeURIComponent(m[2]) : null;
     } catch { return null; }
   }
-
   function pickAccessFrom(raw){
     if (!raw) return null;
     try{
@@ -122,7 +104,6 @@
     }
     return null;
   }
-
   function getAccessTokenFromStores(){
     for (const k of TOKEN_KEYS){
       const v1 = localStorage.getItem(k); const t1 = pickAccessFrom(v1); if (t1) return t1;
@@ -131,7 +112,6 @@
     }
     return null;
   }
-
   function getRefreshToken(){
     for (const k of REFRESH_KEYS){
       const v1 = localStorage.getItem(k);
@@ -144,7 +124,6 @@
     }
     return null;
   }
-
   async function refreshAccess(){
     const refresh = getRefreshToken();
     if (!refresh) return null;
@@ -158,7 +137,6 @@
       const access = data.access || data.token;
       if (access && looksLikeJWT(access)){
         localStorage.setItem("nuamx_token", JSON.stringify({ access }));
-        // Dejar también en 'access' por compatibilidad con tu login.html
         localStorage.setItem("access", access);
         document.cookie = `access=${access}; Path=/; SameSite=Lax`;
         publish("session:changed", { kind:"refreshed" });
@@ -167,7 +145,6 @@
       return null;
     }catch{ return null; }
   }
-
   async function getAccessToken(){
     const direct = getAccessTokenFromStores();
     if (direct) return direct;
@@ -178,38 +155,31 @@
   // authFetch (único punto de contacto)
   // ===================================
   const MUTATING = new Set(["POST","PATCH","PUT","DELETE"]);
-
   function guessTopicFromUrl(url){
     try{
       const u = new URL(url, location.origin);
       const p = u.pathname;
       if (/^\/api\/users\/?/i.test(p) || /^\/api\/roles\/assign\/?/i.test(p)) return "users:changed";
-      if (/^\/api\/calificaciones\/?/i.test(p)) {
-        if (/\/import_(preview|commit)\/?$/i.test(p)) return "calificaciones:changed";
-        return "calificaciones:changed";
-      }
+      if (/^\/api\/calificaciones\/?/i.test(p)) return "calificaciones:changed";
       if (/^\/api\/reportes\/export\/?/i.test(p)) return "reportes:generated";
       if (/^\/api\/me\/?/i.test(p)) return "session:changed";
     }catch{}
     return null;
   }
-
   async function authFetch(input, init){
     const req = typeof input === "string" ? input : (input?.url ?? "");
     const opts = Object.assign({ method:"GET" }, init || {});
     const method = (opts.method || "GET").toUpperCase();
 
-    // Añadir Authorization si tenemos token
     let access = await getAccessToken();
     const headers = new Headers(opts.headers || {});
     if (access && !headers.has("Authorization")) headers.set("Authorization", "Bearer " + access);
     if (!headers.has("Accept")) headers.set("Accept", "application/json, text/plain, */*");
+    // cookies por defecto para compat con SessionAuthentication si aplica
+    opts.credentials = opts.credentials || "same-origin";
     opts.headers = headers;
 
-    // Intento #1
     let res = await fetch(req, opts);
-
-    // Si expira, refrescamos y reintento una vez
     if (res.status === 401 || res.status === 403){
       const fresh = await refreshAccess();
       if (fresh){
@@ -218,17 +188,14 @@
       }
     }
 
-    // Emitir eventos en éxito de mutaciones
     if (res.ok && MUTATING.has(method)){
       const topic = guessTopicFromUrl(req);
       if (topic) publish(topic, { url:req, method, status:res.status });
     }
-
     return res;
   }
-
-  // Hacer disponible para todas las vistas (carga-masiva, detalle, admin-roles, reportes)
   window.authFetch = authFetch;
+  window.doFetch = (url, init) => authFetch(url, init); // compat
 
   // =========================
   // Perfil / RBAC (compat)
@@ -271,7 +238,6 @@
     window.NUAMX_RBAC_FLAGS = flags;
     const badge = $("#rbac_badge"); if (badge) badge.textContent = `Rol: ${role}`;
     const createCard = $("#create_card"); if (createCard) createCard.style.display = flags.isAdmin ? "" : "none";
-    // informar a vistas
     document.dispatchEvent(new CustomEvent('nuamx:rbac-ready', { detail: flags }));
   }
   async function resolveMe(){
@@ -282,8 +248,7 @@
     setFlags(role);
   }
 
-  // Rol por email (cache + endpoint opcional) — compat con Admin/Roles
-  const roleCache = new Map(); // email -> rol
+  const roleCache = new Map();
   function roleFromUser(u){
     if (u?.email && roleCache.has(u.email)) return roleCache.get(u.email);
     const r = (u?.role) || (u?.roles && u.roles[0]) || u?.rol || u?.role_name || null;
@@ -303,7 +268,6 @@
       return null;
     }catch{ return null; }
   }
-
   async function hydrateOneRow(tr, id, email){
     try{
       const r = await authFetch(usersDetailUrl(id));
@@ -331,52 +295,154 @@
   // =========================
   // Auto-actualización suave
   // =========================
-  // Si una página no se suscribe, hacemos una recarga suave (debounced) del módulo actual.
   let reloadTimer = null;
-  function softReload(){
-    if (reloadTimer) return;
-    reloadTimer = setTimeout(()=>{ reloadTimer=null; location.reload(); }, 600);
-  }
-
-  // Heurísticas por módulo (no tocan HTML ni agregan JS extra)
-  // Las vistas pueden cancelar llamando preventDefault en el CustomEvent "nuamx:auto-reload"
+  function softReload(){ if (reloadTimer) return; reloadTimer = setTimeout(()=>{ reloadTimer=null; location.reload(); }, 600); }
   function maybeAutoReload(topic){
     const ev = new CustomEvent("nuamx:auto-reload", { cancelable:true, detail:{ topic } });
     document.dispatchEvent(ev);
-    if (ev.defaultPrevented) return; // la página ya maneja la actualización
-    // Si estamos en módulos relativos al topic, recarga suave
+    if (ev.defaultPrevented) return;
     const p = location.pathname;
     if (topic.startsWith("users:") && (/usuarios|admin-roles|\/users/i.test(p))) return softReload();
     if (topic.startsWith("calificaciones:") && (/carga-masiva|detalle|calificaciones/i.test(p))) return softReload();
-    if (topic.startsWith("reportes:") && (/reportes/i.test(p))) return; // descarga no necesita recarga
+    if (topic.startsWith("reportes:") && (/reportes/i.test(p))) return;
   }
-
-  // Suscripciones globales
   ["users:changed","calificaciones:changed","reportes:generated","session:changed"].forEach(t=>{
     subscribe(t, ()=> maybeAutoReload(t));
   });
 
-  // =========================
-  // Boot mínimo para páginas
-  // =========================
   (async function init(){
     try{ await resolveMe(); }catch{ setFlags("Operador"); }
-    // Exponer helpers de compat para scripts inline existentes
     window.NUAMX._compat = {
       roleCache, roleFromUser, fetchRoleByEmail, hydrateOneRow,
       usersDetailUrl, userPassUrl, URL_LIST, URL_CREATE, URL_ROLE_ASSIGN
     };
   })();
 
-  // =========================
-  // Exportar helpers comunes
-  // =========================
-  window.NUAMX.helpers = Object.assign(window.NUAMX.helpers || {}, {
-    $, $$, fmtDate, toCSV, downloadCSV
-  });
+  window.NUAMX.helpers = Object.assign(window.NUAMX.helpers || {}, { $, $$, fmtDate, toCSV, downloadCSV });
 
-  // Compat: seguir ofreciendo doFetch como en tus plantillas
-  window.doFetch = (url, init) => authFetch(url, init);
+  // ======================================================
+  // GUARD 1: fetch para /api/calificaciones/*
+  // ======================================================
+  (function installCalificacionesFetchGuard(){
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async function(input, init) {
+      try {
+        const reqUrl = typeof input === "string" ? input : (input?.url ?? "");
+        const u = new URL(reqUrl, location.origin);
+        if (!/^\/api\/calificaciones\/?/i.test(u.pathname)) {
+          return nativeFetch(input, init);
+        }
+        const opts = Object.assign({ method: "GET" }, init || {});
+        const headers = new Headers(opts.headers || {});
+        let access = await getAccessToken();
+        if (access && !headers.has("Authorization")) headers.set("Authorization", "Bearer " + access);
+        if (!headers.has("Accept")) headers.set("Accept", "application/json, text/plain, */*");
+        if (!opts.credentials) opts.credentials = "same-origin";
+        opts.headers = headers;
+
+        let res = await nativeFetch(input, opts);
+        if (res.status === 401 || res.status === 403) {
+          const fresh = await refreshAccess();
+          if (fresh) {
+            headers.set("Authorization", "Bearer " + fresh);
+            res = await nativeFetch(input, Object.assign({}, opts, { headers }));
+          }
+        }
+        return res;
+      } catch (e) {
+        return nativeFetch(input, init);
+      }
+    };
+  })();
+
+  // ======================================================
+  // GUARD 2: Axios (si está presente) para /api/calificaciones/*
+  // ======================================================
+  (function installAxiosGuardIfPresent(){
+    const ax = window.axios || window.Axios || null;
+    if (!ax || !ax.interceptors) return;
+
+    // Request: mete Authorization + withCredentials
+    ax.interceptors.request.use(async (config)=>{
+      try{
+        const url = new URL(config.url, location.origin);
+        if (/^\/api\/calificaciones\/?/i.test(url.pathname)) {
+          const access = await getAccessToken();
+          config.headers = config.headers || {};
+          if (access && !config.headers['Authorization']) config.headers['Authorization'] = 'Bearer ' + access;
+          if (!('withCredentials' in config)) config.withCredentials = true;
+        }
+      }catch{}
+      return config;
+    });
+
+    // Response: reintento automático si 401/403
+    ax.interceptors.response.use(
+      (resp)=>resp,
+      async (error)=>{
+        try{
+          const cfg = error?.config || {};
+          if (cfg.__retried) throw error; // evita loop
+          const url = new URL(cfg.url, location.origin);
+          if ((error?.response?.status === 401 || error?.response?.status === 403) && /^\/api\/calificaciones\/?/i.test(url.pathname)) {
+            const fresh = await refreshAccess();
+            if (fresh){
+              cfg.__retried = true;
+              cfg.headers = cfg.headers || {};
+              cfg.headers['Authorization'] = 'Bearer ' + fresh;
+              if (!('withCredentials' in cfg)) cfg.withCredentials = true;
+              return (window.axios || ax)(cfg);
+            }
+          }
+        }catch{}
+        throw error;
+      }
+    );
+  })();
+
+  // ======================================================
+  // GUARD 3: XMLHttpRequest (legacy) para /api/calificaciones/*
+  // ======================================================
+  (function installXHRGuard(){
+    const NativeXHR = window.XMLHttpRequest;
+    if (!NativeXHR) return;
+    function matchCalif(url){
+      try{ const u = new URL(url, location.origin); return /^\/api\/calificaciones\/?/i.test(u.pathname); }
+      catch{ return false; }
+    }
+    function wrapXHR(){
+      const xhr = new NativeXHR();
+      let _url = null; let _method = 'GET'; let needsAuth = false;
+
+      const origOpen = xhr.open;
+      xhr.open = function(method, url, async, user, password){
+        _method = String(method||'GET').toUpperCase();
+        _url = url; needsAuth = matchCalif(url);
+        return origOpen.apply(xhr, arguments);
+      };
+
+      const origSend = xhr.send;
+      xhr.send = async function(body){
+        try{
+          if (needsAuth){
+            try { xhr.withCredentials = true; } catch {}
+            const access = await getAccessToken();
+            if (access) try{ xhr.setRequestHeader('Authorization', 'Bearer ' + access); }catch{}
+          }
+        }catch{}
+        return origSend.apply(xhr, arguments);
+      };
+      return xhr;
+    }
+    // Sobrescribir constructor global
+    window.XMLHttpRequest = function(){ return wrapXHR(); };
+    window.XMLHttpRequest.UNSENT = NativeXHR.UNSENT;
+    window.XMLHttpRequest.OPENED = NativeXHR.OPENED;
+    window.XMLHttpRequest.HEADERS_RECEIVED = NativeXHR.HEADERS_RECEIVED;
+    window.XMLHttpRequest.LOADING = NativeXHR.LOADING;
+    window.XMLHttpRequest.DONE = NativeXHR.DONE;
+    window.XMLHttpRequest.prototype = NativeXHR.prototype;
+  })();
 
   // ========= FIN núcleo =========
 })();

@@ -7,7 +7,6 @@
   <header class="flex items-start justify-between gap-3">
     <div>
       <h2 class="text-2xl font-semibold tracking-tight m-0 flex items-center gap-2">
-        <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-100 text-emerald-700">🗂️</span>
         Instrumentos no inscritos
       </h2>
       <p class="text-sm text-[color:var(--muted)] mt-1">
@@ -15,7 +14,7 @@
       </p>
     </div>
     <div class="hidden md:flex items-center gap-2">
-      <a id="btn_csv_top" class="btn-ghost" href="#" download>⬇️ Exportar CSV</a>
+      <!-- (Exportar CSV del encabezado eliminado) -->
     </div>
   </header>
 
@@ -69,10 +68,10 @@
         <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Filtros activos
       </div>
       <div class="flex gap-2">
-        <button type="button" id="btn_buscar"    class="btn">🔎 Buscar</button>
-        <button type="button" id="btn_limpiar"   class="btn-ghost">🧹 Limpiar</button>
+        <button type="button" id="btn_buscar"     class="btn">🔎 Buscar</button>
+        <button type="button" id="btn_limpiar"    class="btn-ghost">🧹 Limpiar</button>
         <button type="button" id="btn_actualizar" class="btn-ghost">🔄 Actualizar</button>
-        <a id="btn_csv" class="btn-ghost" href="#" download>⬇️ Exportar CSV</a>
+        <!-- Botón de Exportar CSV junto a Actualizar eliminado -->
       </div>
     </div>
 
@@ -256,9 +255,9 @@
   const buildCsvHref = () => {
     const params = readFilters();
     const url = '/api/calificaciones/export_csv?' + qs(params);
-    $("#btn_csv").setAttribute("href", url);
-    $("#btn_csv_top").setAttribute("href", url);
-    $("#btn_csv_bottom").setAttribute("href", url);
+    const bot = $("#btn_csv_bottom");
+    if (bot) bot.setAttribute("href", url);
+    // (btn_csv_top eliminado)
   };
 
   const renderRows = (items) => {
