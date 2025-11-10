@@ -2,6 +2,7 @@
 
 **NUAMX** es una plataforma web construida con **Django** que utiliza **Django REST Framework (DRF)** para gestionar la **autenticación (JWT)** y el **control de usuarios y roles (RBAC)** a través de una API segura.  
 El frontend es renderizado por Django y consume la API mediante JavaScript.
+
 Manual de usuario : https://docs.google.com/document/d/1SDO6DM0cr3O3Fs2VhG7R0z4ISN7CIScp/edit?usp=sharing&ouid=106241663586320063931&rtpof=true&sd=true
 
 ---
