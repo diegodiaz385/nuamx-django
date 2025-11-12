@@ -10,27 +10,27 @@ git clone https://github.com/usuario/nuamx-django.git
 cd nuamx-django```
 
 
-# Crear entorno virtual
+### Crear entorno virtual
 ```powershell
 python3 -m venv .venv```
 
-# Activar entorno
+### Activar entorno
 ```powershell
 source .venv/bin/activate```
 
-# Instalar dependencias
+### Instalar dependencias
 ```powershell
 pip install -r requirements.txt```
 
-# Migrar base de datos
+### Migrar base de datos
 ```powershell
 python3 manage.py migrate```
 
-# Crear superusuario
+### Crear superusuario
 ```powershell
 python3 manage.py createsuperuser```
 
-# Ejecutar servidor
+### Ejecutar servidor
 ```powershell
 python3 manage.py runserver 0.0.0.0:8000```
 
@@ -115,6 +115,4 @@ python manage.py createsuperuser
 
 ```powershell
 python manage.py runserver
-```
-
 ```
