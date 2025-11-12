@@ -1,75 +1,89 @@
-# 🚀 NUAMX - Plataforma Operativa Django/API
+# 🪟 NUAMX - Plataforma Operativa Django/API (Guía para Linux)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 🪟 NUAMX - Plataforma Operativa Django/API (Guía para Windows)
 
 **NUAMX** es una plataforma web construida con **Django** que utiliza **Django REST Framework (DRF)** para gestionar la **autenticación (JWT)** y el **control de usuarios y roles (RBAC)** a través de una API segura.  
 El frontend es renderizado por Django y consume la API mediante JavaScript.
 
-Manual de usuario : https://docs.google.com/document/d/1SDO6DM0cr3O3Fs2VhG7R0z4ISN7CIScp/edit?usp=sharing&oui=106241663586320063931&rtpof=true&sd=true
-
 ---
-
-# 📦 NUAMX — Guía de Instalación y Ejecución (método ZIP)
 
 ## 📋 Requisitos del Sistema
 
-- **Python:** 3.9 o superior  
-- **Gestor de paquetes:** `pip`  
-- **Control de versiones:** `git`
+- **Windows 10 / 11**
+- **Python:** versión 3.9 o superior  
+- **Git:** instalado y configurado  
+- **PIP:** gestor de paquetes de Python  
+- **Editor recomendado:** Visual Studio Code  
 
-> 💡 **Recomendación:** usa siempre un **entorno virtual (`.venv`)** para evitar conflictos de dependencias entre proyectos.  
-> 🧠 En desarrollo se usa **SQLite** (no necesitas Oracle). Si `cx_Oracle`/`oracledb` están en `requirements.txt` y causan errores al instalar, **omítelos** (ver pasos abajo).
-
----
-
-## 🛠️ Guía de Instalación y Ejecución
-
-Sigue las instrucciones específicas para tu sistema operativo.
+> 💡 **Recomendación:** usa siempre un **entorno virtual (`.venv`)** para evitar conflictos de dependencias entre proyectos.
 
 ---
 
-## 🐧 Instalación en Linux (Kali, Ubuntu, Debian)
+## 🧱 1️⃣ Instalar herramientas necesarias
 
-### 1️⃣ Preparar el entorno (método ZIP + panel gráfico)
+### 🔧 Microsoft Visual C++ Build Tools
 
-- **Descarga** el proyecto en **ZIP** desde GitHub.  
-- Abre la carpeta donde quedó el ZIP (por ejemplo, **Descargas**).  
-- **Click derecho** sobre el ZIP → **Extraer aquí**.  
-- *(Opcional)* **Mueve** la carpeta extraída al **Escritorio** para tenerla a mano.  
-- Entra a la carpeta **hasta ver** el archivo **`manage.py`**.  
-- Dentro de esa carpeta, **click derecho** → **Abrir en una terminal**.
+Algunos paquetes de Python (como `cx_Oracle`) requieren compiladores en C++.  
+Descárgalo desde el sitio oficial de Microsoft:
 
-> ✅ A partir de aquí, los comandos asumen que **ya estás** en la carpeta que contiene `manage.py`.
+👉 [https://visualstudio.microsoft.com/visual-cpp-build-tools/](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 
-```bash
-# 1) Instalacion y exportación
-1. Descarga el proyecto en formato ZIP (desde GitHub u otra fuente).
-2. Ve a la carpeta donde quedó el archivo (Ej: Descargas).
-3. Click derecho → “Extraer aquí” (o “Extract Here”).
-4. Mueve la carpeta extraída al Escritorio (opcional, solo para tenerla a mano).
-5. Entra a la carpeta hasta ver `manage.py`.
-6. Click derecho dentro de la carpeta → “Abrir en una terminal”.
-7. Continúa con la sección Instalación.
+Durante la instalación:
+- Marca **“Desktop development with C++”**  
+- Instala los componentes sugeridos  
+- Reinicia el sistema al finalizar (opcional)
 
-# 2) Paquetes base del sistema 
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip git unzip build-essential findutils curl
+---
 
-# 3) Entorno virtual
-python3 -m venv .venv
-source .venv/bin/activate
+## 🐍 2️⃣ Clonar el repositorio del proyecto
 
-# 4) Herramientas de instalación al día
-python -m pip install --upgrade pip setuptools wheel
+Abre **PowerShell** o **Git Bash** en la carpeta donde quieras guardar el proyecto y ejecuta:
 
-# 5) Dependencias del proyecto
-#    (si falla por cx_Oracle/oracledb, se omiten para dev con SQLite)
-pip install -r requirements.txt \
-|| (grep -v -E '^(cx_Oracle|oracledb)\b' requirements.txt > requirements.no_oracle.txt && pip install -r requirements.no_oracle.txt)
+```powershell
+git clone https://github.com/diegodiaz385/nuamx-django.git
+cd nuamx-django
 
-# 6) openpyxl (necesario para descargar la plantilla XLSX)
-python -m pip install --no-cache-dir -i https://pypi.org/simple openpyxl
+🌐 3️⃣ Crear y activar el entorno virtual
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-# 7) Preparar BD y ejecutar
+⚠️ Si PowerShell bloquea la activación, ejecuta como administrador(SOLO SI LA BLOQUEA):
+Set-ExecutionPolicy Unrestricted -Scope Process
+
+pip install --upgrade pip
+pip install -r requirements.txt
+
+4.Aplicar migraciones y crear superusuario
 python manage.py migrate
-python manage.py runserver
+python manage.py createsuperuser
 
+5.Ejecuta el Servidor
+python manage.py runserver
 
