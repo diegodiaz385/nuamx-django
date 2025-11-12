@@ -1,30 +1,30 @@
 # 🪟 NUAMX - Plataforma Operativa Django/API (Guía para Linux)
 
+# Instalar dependencias básicas
+sudo apt update
+sudo apt install python3 python3-pip python3-venv git -y
 
+# Clonar el repositorio
+git clone https://github.com/usuario/nuamx-django.git
+cd nuamx-django
 
+# Crear entorno virtual
+python3 -m venv .venv
 
+# Activar entorno
+source .venv/bin/activate
 
+# Instalar dependencias
+pip install -r requirements.txt
 
+# Migrar base de datos
+python3 manage.py migrate
 
+# Crear superusuario
+python3 manage.py createsuperuser
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Ejecutar servidor
+python3 manage.py runserver 0.0.0.0:8000
 
 
 # 🪟 NUAMX - Plataforma Operativa Django/API (Guía para Windows)
