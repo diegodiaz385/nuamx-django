@@ -67,23 +67,23 @@ Durante la instalación:
 Abre **PowerShell** o **Git Bash** en la carpeta donde quieras guardar el proyecto y ejecuta:
 
 ```powershell
-git clone https://github.com/diegodiaz385/nuamx-django.git
-cd nuamx-django
+- git clone https://github.com/diegodiaz385/nuamx-django.git
+- cd nuamx-django
 
-🌐 3️⃣ Crear y activar el entorno virtual
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+## 🌐 3️⃣ Crear y activar el entorno virtual
+- python -m venv .venv
+- .\.venv\Scripts\Activate.ps1
 
-⚠️ Si PowerShell bloquea la activación, ejecuta como administrador(SOLO SI LA BLOQUEA):
+## ⚠️ Si PowerShell bloquea la activación, ejecuta como administrador(SOLO SI LA BLOQUEA):
 Set-ExecutionPolicy Unrestricted -Scope Process
 
-pip install --upgrade pip
-pip install -r requirements.txt
+- pip install --upgrade pip
+- pip install -r requirements.txt
 
-4.Aplicar migraciones y crear superusuario
-python manage.py migrate
-python manage.py createsuperuser
+## 4.Aplicar migraciones y crear superusuario
+- python manage.py migrate
+- python manage.py createsuperuser
 
-5.Ejecuta el Servidor
-python manage.py runserver
+## 5.Ejecuta el Servidor
+- python manage.py runserver
 
