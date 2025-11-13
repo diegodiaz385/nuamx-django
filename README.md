@@ -1,29 +1,59 @@
-# 🪟 NUAMX - Plataforma Operativa Django/API (Guía para Linux)
-# Instalar dependencias básicas
+# 📦 NUAMX — Guía de Instalación y Ejecución (método ZIP)
+
+## 📋 Requisitos del Sistema
+
+- **Python:** 3.9 o superior  
+- **Gestor de paquetes:** `pip`  
+- **Control de versiones:** `git`
+
+> 💡 **Recomendación:** usa siempre un **entorno virtual (`.venv`)** para evitar conflictos de dependencias entre proyectos.  
+> 🧠 En desarrollo se usa **SQLite** (no necesitas Oracle). Si `cx_Oracle`/`oracledb` están en `requirements.txt` y causan errores al instalar, **omítelos** (ver pasos abajo).
+
+---
+
+## 🛠️ Guía de Instalación y Ejecución
+
+Sigue las instrucciones específicas para tu sistema operativo.
+
+---
+
+## 🐧 Instalación en Linux (Kali)
+
+### 1️⃣ Instalación y ejecución (terminal, dentro del proyecto)
+
+```bash
+# 📦 Paquetes base del sistema
 sudo apt update
-sudo apt install python3 python3-pip python3-venv git -y
+sudo apt install -y python3 python3-venv python3-pip git unzip build-essential findutils curl
 
 # Clonar el repositorio
 git clone https://github.com/usuario/nuamx-django.git
 cd nuamx-django
 
-# Crear entorno virtual
+# 🧪 Entorno virtual
 python3 -m venv .venv
-
-# Activar entorno
 source .venv/bin/activate
 
-# Instalar dependencias
-pip install -r requirements.txt
+# ⬆️ Actualizar herramientas de instalación
+python -m pip install --upgrade pip setuptools wheel
 
-# Migrar base de datos
-python3 manage.py migrate
+# 📚 Dependencias del proyecto
+# Si falla por cx_Oracle/oracledb (no se usan en dev con SQLite), se omiten:
+pip install -r requirements.txt \
+|| (grep -v -E '^(cx_Oracle|oracledb)\b' requirements.txt > requirements.no_oracle.txt && pip install -r requirements.no_oracle.txt)
 
-# Crear superusuario
-python3 manage.py createsuperuser
+# 🧾 Habilitar descarga de plantilla XLSX (endpoint /api/calificaciones/template/)
+python -m pip install --no-cache-dir -i https://pypi.org/simple openpyxl
 
-# Ejecutar servidor
-python3 manage.py runserver 0.0.0.0:8000
+# 🗄️ Migraciones de base de datos
+python manage.py migrate
+
+# 👤 (Opcional) Crear superusuario para el admin
+python manage.py createsuperuser
+
+# ▶️ Ejecutar servidor de desarrollo
+python manage.py runserver 0.0.0.0:8000
+
 
 
 
