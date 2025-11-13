@@ -1,5 +1,9 @@
 # 📦 NUAMX — Guía de Instalación y Ejecución 
 
+## 📖 Manual de Usuario
+- https://docs.google.com/document/d/1SDO6DM0cr3O3Fs2VhG7R0z4ISN7CIScp/edit
+
+
 ## 📋 Requisitos del Sistema
 
 - **Python:** 3.9 o superior  
