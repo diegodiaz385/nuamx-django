@@ -1,4 +1,4 @@
-# 📦 NUAMX — Guía de Instalación y Ejecución (método ZIP)
+# 📦 NUAMX — Guía de Instalación y Ejecución 
 
 ## 📋 Requisitos del Sistema
 
