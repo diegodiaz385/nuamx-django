@@ -58,12 +58,7 @@ python manage.py createsuperuser
 # ▶️ Ejecutar servidor de desarrollo
 python manage.py runserver 0.0.0.0:8000
 
-
-
-
-
-
-
+```
 
 
 
@@ -173,6 +168,4 @@ python manage.py createsuperuser
 
 ```powershell
 python manage.py runserver
-```
-
 ```
