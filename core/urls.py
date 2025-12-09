@@ -1,17 +1,26 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.shortcuts import render
+import requests
+
+def vista_indicadores_economicos(request):
+    try:
+        # Llamamos al microservicio
+        respuesta = requests.get('http://127.0.0.1:5000/indicadores')
+        datos = respuesta.json()
+        
+        # OJO AQUÍ: Agregamos 'web/' antes del nombre del archivo
+        return render(request, 'web/panel_tributario.html', {'info': datos})
+        
+    except requests.exceptions.ConnectionError:
+        return render(request, 'web/panel_tributario.html', {
+            'error': 'No se pudo conectar con el Servicio de Indicadores.'
+        })
 
 urlpatterns = [
-    # 1) URLs auxiliares (descarga de plantillas, etc.)
-    #    Usamos api.download_urls (existe en tu árbol) con rutas ya absolutas tipo "api/..."
     path("", include("api.download_urls")),
-
-    # 2) Sitio web (renderiza templates; la comunicación con datos pasa por /api/...)
     path("", include("web.urls")),
-
-    # 3) API principal (DRF)
     path("api/", include("api.urls")),
-
-    # 4) Admin opcional
     path("dj-admin/", admin.site.urls),
+    path('indicadores/', vista_indicadores_economicos),
 ]
