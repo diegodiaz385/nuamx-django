@@ -9,6 +9,8 @@ from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView, CreateAPIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.parsers import MultiPartParser, FormParser  # ⬅️ necesario para multipart
+from .kafka_client import enviar_evento_calificacion
+
 
 # ⬇️ NUEVO: autenticaciones para permitir cookie de sesión además de JWT
 from rest_framework.authentication import SessionAuthentication
@@ -491,6 +493,47 @@ class CalificacionViewSet(viewsets.ModelViewSet):
             qs = qs.filter(Q(razon_social__isnull=True) | Q(razon_social=""))
 
         return qs
+
+    def _build_kafka_payload(self, instance, accion: str):
+        """
+        Construye el payload estándar para eventos de calificación.
+        """
+        return {
+            "accion": accion,
+            "id": instance.id,
+            "rut": instance.rut,
+            "razon_social": instance.razon_social,
+            "periodo": instance.periodo,
+            "tipo_instrumento": instance.tipo_instrumento,
+            "folio": instance.folio,
+            "monto": int(getattr(instance, "monto", 0) or 0),
+            "moneda": getattr(instance, "moneda", "CLP"),
+            "estado_validacion": instance.estado_validacion,
+            "created_at": instance.created_at.isoformat() if getattr(instance, "created_at", None) else None,
+        }
+
+    def perform_create(self, serializer):
+        """
+        Al crear una calificación, enviamos un evento a Kafka (si está habilitado).
+        """
+        instance = serializer.save()
+        try:
+            payload = self._build_kafka_payload(instance, "create")
+            enviar_evento_calificacion(payload)
+        except Exception:
+            # Nunca rompemos el flujo de la API por un error de Kafka.
+            pass
+
+    def perform_update(self, serializer):
+        """
+        Al actualizar una calificación, también enviamos un evento.
+        """
+        instance = serializer.save()
+        try:
+            payload = self._build_kafka_payload(instance, "update")
+            enviar_evento_calificacion(payload)
+        except Exception:
+            pass
 
     # ==================== NUEVO: Enriquecer en el listado ====================
     def list(self, request, *args, **kwargs):
