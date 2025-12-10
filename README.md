@@ -169,3 +169,77 @@ python manage.py createsuperuser
 ```powershell
 python manage.py runserver
 ```
+## 🐳 Kafka en Windows (opcional, para eventos de calificación)
+
+NUAMX puede enviar eventos a Kafka cada vez que se crean o actualizan calificaciones.  
+Si no configuras Kafka, la app funciona igual: solo verás mensajes en consola indicando que el **producer está deshabilitado**.
+
+---
+
+### 1\. Instalar y verificar Docker Desktop
+
+Para ejecutar Kafka en Windows utilizaremos **Docker Desktop**.
+
+1. Descarga Docker Desktop para Windows desde:  
+   https://www.docker.com/products/docker-desktop/
+2. Instálalo siguiendo el asistente (acepta el uso de **WSL2** si lo pide).
+3. Abre Docker Desktop una vez para que arranque el daemon.
+
+Verifica en consola (PowerShell o CMD) que Docker funciona:
+
+```bash
+docker version
+```
+
+### 2\. Levantar Zookeeper y Kafka con docker-compose
+
+En la carpeta raíz del proyecto existe un archivo docker-compose.yml con la configuración de Zookeeper y Kafka (servicios nuamx-zookeeper y nuamx-kafka).
+
+Desde la carpeta del proyecto, levanta los servicios en segundo plano:
+
+```bash
+C:\Users\aronb\Desktop\Nuamx\nuamx a>
+docker compose up -d
+```
+
+Comprueba que los contenedores están levantados:
+
+```bash
+docker ps
+```
+
+Deberías ver algo similar a:
+
+```bash
+CONTAINER ID   IMAGE                             PORTS
+...            confluentinc/cp-kafka:7.6.1       0.0.0.0:9092->9092/tcp
+...            confluentinc/cp-zookeeper:7.6.1   0.0.0.0:2181->2181/tcp
+```
+
+Nota: Mientras uses Kafka, no cierres Docker Desktop ni pares estos contenedores.
+
+### 3\. Activar el envío de eventos a Kafka en NUAMX
+
+El backend solo enviará eventos a Kafka si la variable de entorno KAFKA_ENABLED está en 1.
+
+Abre una nueva consola entra a la carpeta del proyecto:
+
+```bash
+C:\Users\aronb\Desktop\Nuamx\nuamx a>
+.\.venv\Scripts\Activate
+```
+
+Habilita Kafka en esa sesión y arranca Django:
+
+```bash
+set KAFKA_ENABLED=1
+```
+
+Iniciar Django
+
+```bash
+python manage.py runserver
+```
+
+Nota: Si KAFKA_ENABLED no está en 1, la app seguirá funcionando normalmente; solo verás mensajes en consola indicando que el producer Kafka está deshabilitado.
+
