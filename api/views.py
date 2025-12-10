@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Q, F, Value
+from django.db.models.functions import Replace
 from django.http import HttpResponse, FileResponse
 from rest_framework import status, permissions, filters, viewsets
 from rest_framework.decorators import api_view, permission_classes, action
@@ -102,6 +103,40 @@ def _truthy(val) -> bool:
     """Interpreta strings como 1/true/on/sí/si."""
     s = str(val or "").strip().lower()
     return s in ("1", "true", "on", "sí", "si", "yes", "y")
+
+
+# ====== NUEVO: helpers para RUT flexible ======
+def _clean_rut_string(s: str) -> str:
+    """
+    Limpia un RUT en texto, quitando puntos, guiones y espacios.
+    Ej: '12.345.678-9' -> '123456789'
+    """
+    s = (s or "").strip()
+    return re.sub(r"[.\-\s]", "", s)
+
+
+def _apply_rut_filter(qs, rut_raw: str):
+    """
+    Aplica un filtro de RUT 'flexible', ignorando ., - y espacios
+    tanto en el parámetro como en lo almacenado en BD.
+
+    No altera cómo se guarda el RUT, solo cómo se filtra.
+    """
+    rut_clean = _clean_rut_string(rut_raw)
+    if not rut_clean:
+        return qs
+
+    # Normalizamos el campo rut en BD quitando ., - y espacios
+    qs = qs.annotate(
+        rut_norm=Replace(
+            Replace(
+                Replace(F("rut"), Value("."), Value("")),
+                Value("-"), Value("")
+            ),
+            Value(" "), Value("")
+        )
+    ).filter(rut_norm__icontains=rut_clean)
+    return qs
 
 
 # ================ Resolución de razón social (“de todos lados”) ================
@@ -439,7 +474,7 @@ class CalificacionViewSet(viewsets.ModelViewSet):
         want_noi = no_inscritos in ("1", "true", "on", "sí", "si")
 
         if rut:
-            qs = qs.filter(rut__icontains=rut)
+            qs = _apply_rut_filter(qs, rut)
         if razon:
             qs = qs.filter(razon_social__icontains=razon)
         if pdesde:
@@ -1284,14 +1319,22 @@ class ReporteExportView(APIView):
         no_inscritos = (qp.get("no_inscritos") or qp.get("noi") or "").strip().lower()
         want_noi = no_inscritos in ("1", "true", "on", "sí", "si")
 
-        if rut: qs = qs.filter(rut__icontains=rut)
-        if razon: qs = qs.filter(razon_social__icontains=razon)
-        if pdesde: qs = qs.filter(periodo__gte=pdesde)
-        if phasta: qs = qs.filter(periodo__lte=phasta)
-        if tipo: qs = qs.filter(tipo_instrumento=tipo)
-        if estado: qs = qs.filter(estado_validacion=estado)
-        if moneda: qs = qs.filter(moneda=moneda)
-        if want_noi: qs = qs.filter(Q(razon_social__isnull=True) | Q(razon_social=""))
+        if rut:
+            qs = _apply_rut_filter(qs, rut)
+        if razon:
+            qs = qs.filter(razon_social__icontains=razon)
+        if pdesde:
+            qs = qs.filter(periodo__gte=pdesde)
+        if phasta:
+            qs = qs.filter(periodo__lte=phasta)
+        if tipo:
+            qs = qs.filter(tipo_instrumento=tipo)
+        if estado:
+            qs = qs.filter(estado_validacion=estado)
+        if moneda:
+            qs = qs.filter(moneda=moneda)
+        if want_noi:
+            qs = qs.filter(Q(razon_social__isnull=True) | Q(razon_social=""))
         return qs
 
     def get(self, request):

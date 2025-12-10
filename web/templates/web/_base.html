@@ -16,17 +16,55 @@
 
   <style>
     :root{
-      --nuamx:#0A6A3B; --nuamx-dark:#064F2C;
-      --ink:#1F2937; --muted:#6B7280; --bg:#F8FAFC; --card:#FFFFFF; --border:#E5E7EB;
+      /* Colores base NUAMX (ahora naranjo) */
+      --nuamx:#FF4500;
+      --nuamx-dark:#CC3700;
+
+      --ink:#1F2937;
+      --muted:#6B7280;
+      --bg:#F8FAFC;
+      --card:#FFFFFF;
+      --border:#E5E7EB;
     }
-    .btn{background:var(--nuamx);color:#fff;padding:.55rem 1rem;border-radius:.6rem;font-weight:600}
+    .btn{
+      background:var(--nuamx);
+      color:#fff;
+      padding:.55rem 1rem;
+      border-radius:.6rem;
+      font-weight:600;
+    }
     .btn:hover{background:var(--nuamx-dark)}
-    .btn-ghost{border:1px solid var(--border);padding:.5rem .9rem;border-radius:.6rem;background:#fff}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:1rem}
-    .kpi .label{font-size:.8rem;color:var(--muted)}
-    .kpi .value{font-size:1.6rem;font-weight:700}
-    .nav a{display:block;padding:.6rem .9rem;border-radius:.6rem}
-    .nav a.active{background:#F0FFF6;color:#064F2C;font-weight:600;border:1px solid #D1FAE5}
+    .btn-ghost{
+      border:1px solid var(--border);
+      padding:.5rem .9rem;
+      border-radius:.6rem;
+      background:#fff;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:1rem;
+    }
+    .kpi .label{
+      font-size:.8rem;
+      color:var(--muted);
+    }
+    .kpi .value{
+      font-size:1.6rem;
+      font-weight:700;
+    }
+    .nav a{
+      display:block;
+      padding:.6rem .9rem;
+      border-radius:.6rem;
+    }
+    /* Estado activo del menú en tonos naranjo */
+    .nav a.active{
+      background:#FFF1E6;
+      color:#CC3700;
+      font-weight:600;
+      border:1px solid #FED7C2;
+    }
   </style>
 
   {% block extra_head %}{% endblock %}
@@ -61,7 +99,9 @@
     </aside>
 
     <main class="flex-1 p-6 md:p-8">
-      <div class="text-sm text-[color:var(--muted)] mb-2">{% block breadcrumb %}Inicio / Sección{% endblock %}</div>
+      <div class="text-sm text-[color:var(--muted)] mb-2">
+        {% block breadcrumb %}Inicio / Sección{% endblock %}
+      </div>
 
       <div class="mb-4">
         <h1 class="text-2xl font-semibold">

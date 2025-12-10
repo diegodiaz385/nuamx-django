@@ -8,11 +8,32 @@
   <title>Iniciar sesión • NUAMX</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root{ --nuamx:#0A6A3B; --nuamx-dark:#064F2C; --ink:#1F2937; --muted:#6B7280; --bg:#F8FAFC; --card:#FFFFFF; --border:#E5E7EB; }
-    .btn{background:var(--nuamx);color:#fff;padding:.6rem 1rem;border-radius:.6rem;font-weight:600}
+    :root{
+      --nuamx:#FF4500;
+      --nuamx-dark:#CC3700;
+      --ink:#1F2937;
+      --muted:#6B7280;
+      --bg:#F8FAFC;
+      --card:#FFFFFF;
+      --border:#E5E7EB;
+    }
+    .btn{
+      background:var(--nuamx);
+      color:#fff;
+      padding:.6rem 1rem;
+      border-radius:.6rem;
+      font-weight:600
+    }
     .btn:hover{background:var(--nuamx-dark)}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:1rem}
-    a{color:var(--nuamx-dark); font-weight:600}
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:1rem
+    }
+    a{
+      color:var(--nuamx-dark);
+      font-weight:600
+    }
   </style>
 </head>
 <body class="min-h-screen bg-[color:var(--bg)] text-[color:var(--ink)] flex items-center justify-center p-4">
@@ -111,7 +132,7 @@
         localStorage.setItem('me', JSON.stringify(me));
 
         // Redirección post login
-        location.href = '/dashboard/'; // 🚨 CORRECCIÓN APLICADA AQUÍ: Usa ruta absoluta
+        location.href = '/dashboard/';
       } catch (err) {
         console.error(err);
         if (errorEl) {

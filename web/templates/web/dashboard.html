@@ -25,8 +25,32 @@
   th{text-align:left;font-size:.9rem;color:#6b7280}
   td{font-size:.95rem}
 
-  .btn{display:inline-flex;align-items:center;gap:8px;background:#0A6A3B;color:#fff;border-radius:10px;padding:10px 14px}
-  .btn-ghost{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#0A6A3B;border:1px solid #0A6A3B;border-radius:10px;padding:10px 14px}
+  /* Botones ahora usan la paleta naranjo global */
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--nuamx);
+    color:#fff;
+    border-radius:10px;
+    padding:10px 14px;
+    font-weight:600;
+    border:1px solid transparent;
+  }
+  .btn:hover{
+    background:var(--nuamx-dark);
+  }
+  .btn-ghost{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:#fff;
+    color:var(--nuamx);
+    border:1px solid var(--nuamx);
+    border-radius:10px;
+    padding:10px 14px;
+    font-weight:600;
+  }
 
   .quick-grid{display:grid;gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
   @media (max-width: 980px){ .quick-grid{grid-template-columns:1fr} }
@@ -39,7 +63,7 @@
   .quick-icon{
     width:42px;height:42px; min-width:42px; border-radius:50%;
     display:flex;align-items:center;justify-content:center;
-    background:#E8FFF2;
+    background:#FFF1E6; /* tono suave naranjo */
     font-size:22px;
   }
   .quick-title{font-weight:700}
