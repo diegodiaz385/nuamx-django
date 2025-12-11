@@ -14,6 +14,9 @@ urlpatterns = [
     path("reportes/", views.reportes_view, name="reportes"),
     path("no-inscritos/", views.no_inscritos_view, name="no-inscritos"),
     path("admin-roles/", views.admin_roles_view, name="admin-roles"),
+    path('auditoria/', views.auditoria_view, name='auditoria'),
+    path("panel-tributario/", views.panel_tributario_view, name="panel-tributario"),
+
 
     # Página de cambio obligatorio de contraseña
     path("force-password/", views.force_password_view, name="force_password"),

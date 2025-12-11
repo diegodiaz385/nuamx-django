@@ -1,0 +1,49 @@
+{% extends "web/_base.html" %}
+
+{% block breadcrumb %}
+Inicio / Panel Tributario
+{% endblock %}
+
+{% block page_title %}
+Panel Tributario
+{% endblock %}
+
+{% block page_subtitle %}
+Parámetros tributarios obtenidos desde el Microservicio Tributario (puerto 5002).
+{% endblock %}
+
+{% block content %}
+
+{% if conectado %}
+<div class="mb-6 p-4 rounded-lg bg-green-50 border border-green-200">
+    <span class="text-green-700 font-medium">
+        Microservicio Tributario conectado correctamente.
+    </span>
+</div>
+
+<div class="card p-6 space-y-3">
+    <h2 class="text-lg font-semibold">Parámetros Tributarios</h2>
+
+    <p><strong>IVA:</strong> {{ tributario.iva }}%</p>
+    <p><strong>Impuesto adicional a servicios:</strong> {{ tributario.impuesto_adicional_servicios }}%</p>
+    <p><strong>Retención de honorarios:</strong> {{ tributario.retencion_honorarios }}%</p>
+    <p><strong>UF referencia:</strong> {{ tributario.uf_referencia }}</p>
+
+    <p class="text-xs text-gray-500 mt-4">
+        {{ tributario.descripcion }}
+    </p>
+</div>
+
+{% else %}
+<div class="p-6 bg-red-50 border border-red-200 rounded-lg text-center">
+    <h3 class="text-red-700 font-bold text-lg mb-2">⚠️ Error de Conexión</h3>
+    <p class="text-red-600 mb-4">{{ error }}</p>
+    <p class="text-sm text-gray-500">
+        Asegúrate de que el microservicio del Panel Tributario esté corriendo:<br>
+        <code class="bg-gray-200 px-2 py-1 rounded">python app.py</code>
+    </p>
+    <a href="/panel-tributario/" class="btn mt-4 inline-block">Reintentar Conexión</a>
+</div>
+{% endif %}
+
+{% endblock %}

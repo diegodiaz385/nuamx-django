@@ -1,71 +1,98 @@
-arabic-reshaper==3.0.0
-asgiref==3.9.1
-asn1crypto==1.5.1
-blinker==1.9.0
-certifi==2025.10.5
-cffi==2.0.0
-charset-normalizer==3.4.4
-click==8.2.1
-colorama==0.4.6
-contourpy==1.3.1
-cryptography==46.0.3
-cssselect2==0.8.0
-cx_Oracle==8.3.0
-cycler==0.12.1
-dj-database-url==3.0.1
+# ==========================================================
+# NUAMX – Dependencias del proyecto
+# (Django + Microservicios + utilidades)
+# ==========================================================
+
+# --- Core Django / DRF ---
 Django==5.2.6
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
-dnspython==2.8.0
-et_xmlfile==2.0.0
-Flask==3.1.2
-fonttools==4.55.3
-freetype-py==2.5.1
-graphviz==0.20.3
-html5lib==1.1
-idna==3.11
-instaloader==4.15
-itsdangerous==2.2.0
-Jinja2==3.1.6
-kafka-python==2.3.0
-kiwisolver==1.4.7
-lxml==6.0.2
-MarkupSafe==3.0.2
-networkx==3.4.2
-numpy==2.2.0
-openpyxl==3.1.5
-oracledb==3.4.0
-oscrypto==1.3.0
-packaging==24.2
-pandas==2.2.3
-pillow==11.3.0
-pycairo==1.29.0
-pycparser==2.23
-pydotplus==2.0.2
-pyHanko==0.31.0
-pyhanko-certvalidator==0.29.0
-PyJWT==2.10.1
-pymongo==4.14.1
-pyparsing==3.2.0
-pypdf==6.2.0
-python-bidi==0.6.7
-python-dateutil==2.9.0.post0
-python-dotenv==1.2.1
-pytz==2024.2
-PyYAML==6.0.3
-reportlab==4.4.4
-requests==2.32.5
-rlPyCairo==0.4.0
-six==1.17.0
+dj-database-url==3.0.1
+asgiref==3.9.1
 sqlparse==0.5.3
-svglib==1.6.0
-tinycss2==1.4.0
-typing_extensions==4.15.0
+
+# --- HTTPS / SSL en desarrollo ---
+django-sslserver==0.22   # si no aparece, puedes agregarlo aquí (pero si ya está en tu archivo no dupliques)
+
+# --- Microservicios (Flask) ---
+Flask==3.1.2
+Werkzeug==3.1.3
+itsdangerous==2.2.0
+click==8.2.1
+blinker==1.9.0
+Jinja2==3.1.6
+
+# --- HTTP / Requests ---
+requests==2.32.5
+urllib3==2.5.0
+charset-normalizer==3.4.4
+idna==3.11
+certifi==2025.10.5
+django-sslserver==0.22
+
+# --- Kafka ---
+kafka-python==2.3.0
+
+# --- Bases de datos / conectores ---
+oracledb==3.4.0
+cx_Oracle==8.3.0
+dnspython==2.8.0
+pymongo==4.14.1
+
+# --- Fechas, zonas horarias y utilidades ---
+python-dateutil==2.9.0.post0
+pytz==2024.2
 tzdata==2025.2
 tzlocal==5.3.1
+typing_extensions==4.15.0
+six==1.17.0
+colorama==0.4.6
+packaging==24.2
+
+# --- Ciencia de datos / gráficos ---
+numpy==2.2.0
+pandas==2.2.3
+pillow==11.3.0
+contourpy==1.3.1
+cycler==0.12.1
+fonttools==4.55.3
+kiwisolver==1.4.7
+graphviz==0.20.3
+pydotplus==2.0.2
+networkx==3.4.2
+pyparsing==3.2.0
+
+# --- PDFs, reportes, firmas digitales (pyHanko, reportlab, xhtml2pdf, etc.) ---
+arabic-reshaper==3.0.0
+asn1crypto==1.5.1
+cssselect2==0.8.0
+et_xmlfile==2.0.0
+freetype-py==2.5.1
+html5lib==1.1
+instaloader==4.15
+lxml==6.0.2
+openpyxl==3.1.5
+oscrypto==1.3.0
+pycairo==1.29.0
+pyHanko==0.31.0
+pyhanko-certvalidator==0.29.0
+pypdf==6.2.0
+python-bidi==0.6.7
+PyYAML==6.0.3
+reportlab==4.4.4
+rlPyCairo==0.4.0
+svglib==1.6.0
+tinycss2==1.4.0
 uritools==5.0.0
-urllib3==2.5.0
 webencodings==0.5.1
-Werkzeug==3.1.3
 xhtml2pdf==0.2.17
 xlrd==1.2.0
+
+# --- Criptografía / Capa baja ---
+cffi==2.0.0
+cryptography==46.0.3
+pycparser==2.23
+PyJWT==2.10.1
+
+# --- Otras utilidades ---
+python-dotenv==1.2.1

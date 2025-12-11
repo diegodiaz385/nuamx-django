@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     # Apps del proyecto
     "api",
     "web",
+    "sslserver",  # ← agregada para HTTPS en desarrollo
 ]
 
 MIDDLEWARE = [

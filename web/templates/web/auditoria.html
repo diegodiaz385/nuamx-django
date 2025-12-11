@@ -1,0 +1,67 @@
+{% extends "web/_base.html" %}
+
+{% block breadcrumb %}
+Inicio / Auditoría
+{% endblock %}
+
+{% block page_title %}
+Auditoría del Sistema
+{% endblock %}
+
+{% block page_subtitle %}
+<p class="text-sm text-gray-500 mt-1">
+  Registro de eventos generados por la plataforma NUAMX. Datos obtenidos desde el Microservicio de Auditoría (Puerto 5001).
+</p>
+{% endblock %}
+
+{% block content %}
+
+{% if error %}
+  <!-- Error de conexión al microservicio -->
+  <div class="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded mb-6 text-sm">
+    <p class="font-semibold">No se pudo conectar al Microservicio de Auditoría</p>
+    <p class="mt-1"><code>{{ error }}</code></p>
+  </div>
+
+{% else %}
+  <!-- Microservicio conectado -->
+  <div class="bg-green-100 border border-green-300 text-green-900 px-4 py-3 rounded mb-6 text-sm">
+    Microservicio Auditoría conectado correctamente.
+  </div>
+
+  {% if eventos and eventos|length > 0 %}
+    <!-- Tabla de eventos -->
+    <div class="card p-4">
+      <h2 class="text-lg font-semibold mb-4">Eventos registrados: {{ eventos|length }}</h2>
+
+      <table class="min-w-full text-sm border">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="border px-3 py-2">Fecha</th>
+            <th class="border px-3 py-2">Usuario</th>
+            <th class="border px-3 py-2">Acción</th>
+            <th class="border px-3 py-2">Detalle</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in eventos %}
+          <tr class="hover:bg-gray-50">
+            <td class="border px-3 py-2">{{ e.registrado_en }}</td>
+            <td class="border px-3 py-2">{{ e.usuario }}</td>
+            <td class="border px-3 py-2">{{ e.accion }}</td>
+            <td class="border px-3 py-2">{{ e.detalle }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  {% else %}
+    <!-- No hay eventos -->
+    <p class="text-gray-500 text-sm mt-4">
+      No hay eventos registrados todavía.
+    </p>
+  {% endif %}
+{% endif %}
+
+{% endblock %}
