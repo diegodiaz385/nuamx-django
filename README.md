@@ -1,4 +1,4 @@
-# 📦 NUAMX — Guía de Instalación y Ejecución 
+# 📦 NUAMX — Guía de Instalación y Ejecución linux
 
 ## 📖 Manual de Usuario
 - https://docs.google.com/document/d/1SDO6DM0cr3O3Fs2VhG7R0z4ISN7CIScp/edit
@@ -58,7 +58,84 @@ python manage.py createsuperuser
 # ▶️ Ejecutar servidor de desarrollo
 python manage.py runserver 0.0.0.0:8000
 
+#### 🐧 Opción B: README para Linux
+*(Ideal si tu profesor lo revisa en Linux o para despliegue en servidor)*
+
+```markdown
+# Backend Nuamx - Django HTTPS (Linux)
+
+Backend principal del sistema Nuamx ejecutado con HTTPS.
+
+## 📋 Requisitos
+* Python 3 y `pip` instalados.
+* `virtualenv` instalado (`sudo apt install python3-venv`).
+* Certificados `cert.pem` y `key.pem`.
+
+## 🚀 Instalación en Linux
+
+1.  **Entrar al directorio:**
+    ```bash
+    cd nuamx-django
+    ```
+
+2.  **Crear entorno virtual:**
+    ```bash
+    python3 -m venv venv
+    ```
+
+3.  **Activar entorno:**
+    ```bash
+    source venv/bin/activate
+    ```
+
+4.  **Instalar dependencias:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## ▶️ Ejecución
+Ejecutar el servidor con SSL:
+
+```bash
+python3 manage.py runsslserver
+
+#### 🐧 Opción B: README para Linux
+
+```markdown
+# Microservicio de Envíos - Flask (Linux)
+
+Microservicio encargado de la logística de envíos.
+
+## ⚙️ Configuración en Linux ( Se repite Con todos los  microservicios)
+
+1.  **Entrar a la carpeta:**
+    ```bash
+    cd microservicio_envios
+    ```
+
+2.  **Crear entorno virtual:**
+    ```bash
+    python3 -m venv venv
+    ```
+
+3.  **Activar entorno:**
+    ```bash
+    source venv/bin/activate
+    ```
+
+4.  **Instalar dependencias:**
+    ```bash
+    pip install flask
+    # O si tienes requirements: pip install -r requirements.txt
+    ```
+
+## ▶️ Ejecución
+
+```bash
+python3 app.py
+
 ```
+
 
 
 
@@ -243,3 +320,76 @@ python manage.py runserver
 
 Nota: Si KAFKA_ENABLED no está en 1, la app seguirá funcionando normalmente; solo verás mensajes en consola indicando que el producer Kafka está deshabilitado.
 
+# Backend Nuamx - Django HTTPS (Windows)
+
+Backend principal del sistema Nuamx. Se ejecuta sobre Django utilizando certificados SSL locales (HTTPS).
+
+## 📋 Requisitos
+* Python instalado en Windows.
+* Archivos `cert.pem` y `key.pem` en la carpeta raíz.
+
+## 🚀 Instalación en Windows
+
+1.  **Abrir terminal (PowerShell/CMD) en la carpeta del proyecto:**
+    ```powershell
+    cd nuamx-django
+    ```
+
+2.  **Crear el entorno virtual:**
+    ```powershell
+    python -m venv venv
+    ```
+
+3.  **Activar el entorno:**
+    ```powershell
+    .\venv\Scripts\activate
+    ```
+    *(Si da error de permisos, ejecutar: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process`)*
+
+4.  **Instalar librerías:**
+    ```powershell
+    pip install -r requirements.txt
+    ```
+
+## ▶️ Ejecución
+Para iniciar el servidor seguro:
+
+```powershell
+python manage.py runsslserver
+
+### 2. MICROSERVICIO ENVÍOS (Flask) ( Se repite Con todos los  microservicios)
+
+#### 🪟 Opción A: README para Windows
+
+```markdown
+# Microservicio de Envíos - Flask (Windows)
+
+Microservicio encargado de la logística de envíos.
+
+## ⚙️ Configuración en Windows
+
+1.  **Entrar a la carpeta del microservicio:**
+    ```powershell
+    cd microservicio_envios
+    ```
+
+2.  **Crear entorno virtual:**
+    ```powershell
+    python -m venv venv
+    ```
+
+3.  **Activar entorno:**
+    ```powershell
+    .\venv\Scripts\activate
+    ```
+
+4.  **Instalar Flask y dependencias:**
+    ```powershell
+    pip install flask
+    # O si tienes requirements: pip install -r requirements.txt
+    ```
+
+## ▶️ Ejecución
+
+```powershell
+python app.py
